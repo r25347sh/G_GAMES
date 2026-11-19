@@ -51,6 +51,16 @@
         ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
         if (e.type === "orbital") { ctx.lineWidth = (e.width || 28) * 0.35; ctx.strokeStyle = "#fff"; ctx.stroke(); }
         ctx.globalAlpha = 1;
+      } else if (e.type === "blackhole") {
+        var bx = sx(e.x), by = sy(e.y);
+        var grd = ctx.createRadialGradient(bx, by, 0, bx, by, e.radius || 160);
+        grd.addColorStop(0, "rgba(20,0,40,0.85)");
+        grd.addColorStop(0.5, "rgba(155,93,229,0.35)");
+        grd.addColorStop(1, "rgba(155,93,229,0)");
+        ctx.fillStyle = grd;
+        ctx.beginPath(); ctx.arc(bx, by, e.radius || 160, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "rgba(155,93,229,0.7)"; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(bx, by, (e.radius || 160) * 0.35, 0, Math.PI * 2); ctx.stroke();
       } else if (e.type === "empRing") {
         ctx.beginPath(); ctx.arc(sx(e.x), sy(e.y), e.r, 0, Math.PI * 2);
         ctx.strokeStyle = "rgba(125,249,255,0.55)"; ctx.lineWidth = 3; ctx.stroke();
