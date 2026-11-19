@@ -2,13 +2,13 @@
   "use strict";
   var canvas, ctx, loop, player, camera, world, combat, loadout, netSync, minimapCanvas;
   var mapHazards, scoreBoard;
-  var active = false, fireMainCd = 0, fireSubCd = 0, fireGadgetCd = 0, cyberTint = 0;
+  var active = false, fireMainCd = 0, fireSubCd = 0, fireGadgetCd = 0, cyberTint = 0, secretIdx = 0, secretCd = 0;
   var aiList = [], gameMode = "solo", els = {};
   function $(id) { return document.getElementById(id); }
   function initDom() {
     els.gameLayer = $("game-layer"); canvas = $("game-canvas"); minimapCanvas = $("minimap-canvas");
-    els.hudHp = $("hud-hp"); els.hudBoost = $("hud-boost"); els.hudSpeed = $("hud-speed");
-    els.hudCoord = $("hud-coord"); els.hudFps = $("hud-fps"); els.btnExit = $("btn-exit-game");
+    els.hudHp = $("hud-hp"); els.hudHpText = $("hud-hp-text"); els.hudBoost = $("hud-boost"); els.hudSpeed = $("hud-speed");
+    els.secretSlot = $("secret-slot"); els.hudCoord = $("hud-coord"); els.hudFps = $("hud-fps"); els.btnExit = $("btn-exit-game");
     els.borderWarn = $("border-warn"); els.weaponMain = $("weapon-main"); els.weaponSub = $("weapon-sub");
     els.weaponGadget = $("weapon-gadget"); els.hudHeat = $("hud-heat"); els.hudEnergy = $("hud-energy");
     els.hudAmmo = $("hud-ammo"); els.respawnOverlay = $("respawn-overlay"); els.killFeed = $("kill-feed");
@@ -28,10 +28,29 @@
     if (camera) camera.resize(w, h);
   }
   function roomState() { return window.WWNRoom && WWNRoom.getState && WWNRoom.getState(); }
-  function spawnFillerBots(count, diff) {
+  function spawnFillerBots() {
+    var groups = ["G1", "G2", "G3", "G4", "G5"];
+    var idx = 0;
+    for (var g = 0; g < groups.length; g++) {
+      for (var n = 0; n < 2; n++) {
+        var bot = new WWNAiPilot("cpu-auto-" + (++idx), "easy", idx, groups[g]);
+        bot.openWeak = true;
+        aiList.push(bot);
+      }
+    }
+  }
+  function spawnAllyBots(count) {
+    count = Math.max(1, Math.min(5, count || 1));
     for (var i = 0; i < count; i++) {
-      var bot = new WWNAiPilot("cpu-auto-" + (aiList.length + 1), diff || "easy");
-      bot.team = "RED"; aiList.push(bot);
+      var bot = new WWNAiPilot("cpu-ally-" + (aiList.length + 1), "normal", aiList.length + i, "ALLY");
+      bot.team = player ? player.team : "BLUE";
+      bot.group = "ALLY"; bot.isAlly = true; bot.openWeak = false;
+      if (player) {
+        bot.x = player.x - Math.cos(player.angle) * (60 + i * 30);
+        bot.y = player.y - Math.sin(player.angle) * (60 + i * 30);
+        bot.angle = player.angle;
+      }
+      aiList.push(bot);
     }
   }
   function startGame(options) {
@@ -62,26 +81,48 @@
         }
       }
     };
-    if (gameMode === "online") netSync.bind();
+    if (gameMode === "online") {
+      netSync.bind();
+      try {
+        var plist = (window.WWNRoom && WWNRoom.getPlayerList) ? WWNRoom.getPlayerList() : [];
+        for (var pi = 0; pi < plist.length; pi++) {
+          var p = plist[pi];
+          if (!p.peerId || p.peerId === player.netId) continue;
+          if (String(p.peerId).indexOf("_MASTER") >= 0) continue;
+          netSync._onState({ t: "st", id: p.peerId, x: (Math.random() - 0.5) * 400, y: (Math.random() - 0.5) * 400, vx: 0, vy: 0, a: 0, hp: 100, b: 0, team: p.team || "NONE", st: 0, u: p.username || "Pilot" });
+        }
+      } catch (_) {}
+      if (window.WWNRoom && WWNRoom.ensureMesh) WWNRoom.ensureMesh();
+    }
     if (gameMode === "cpu") {
       var n = Math.max(1, Math.min(8, options.cpuCount || 1));
       var diff = options.difficulty || "normal";
-      for (var i = 0; i < n; i++) aiList.push(new WWNAiPilot("cpu-" + (i + 1), diff));
+      var groups = ["G1","G2","G3","G4","G5"];
+      for (var i = 0; i < n; i++) aiList.push(new WWNAiPilot("cpu-" + (i + 1), diff, i, groups[i % groups.length]));
     } else {
-      spawnFillerBots(2, "easy");
+      spawnFillerBots();
     }
     resize(); WWNInput.bind(canvas);
     try { canvas.focus(); } catch (_) {}
     window.focus();
     loop = new WWNGameLoop(update, render); loop.start();
     if (els.btnExit) els.btnExit.onclick = stopGame;
-    window.addEventListener("resize", resize); updateWeaponHud();
+    window.addEventListener("resize", resize);
+    updateWeaponHud(); updateSecretHud();
   }
   function stopGame() {
     active = false; if (loop) loop.stop(); WWNInput.unbind();
     window.removeEventListener("resize", resize);
     if (els.gameLayer) els.gameLayer.classList.add("hidden");
     document.body.classList.remove("in-game"); aiList = [];
+  }
+  function updateSecretHud() {
+    if (!els.secretSlot || !window.WWNSecret) return;
+    var ul = WWNSecret.getUnlockedList();
+    if (!ul.length) { els.secretSlot.textContent = "—"; els.secretSlot.style.opacity = "0.35"; return; }
+    if (secretIdx >= ul.length) secretIdx = 0;
+    els.secretSlot.textContent = WWNSecret.getMeta(ul[secretIdx]).name;
+    els.secretSlot.style.opacity = "1";
   }
   function updateWeaponHud() {
     if (!loadout) return;
@@ -108,14 +149,20 @@
     if (WWNInput.consumeCycleMain()) { loadout.cycleMain(); updateWeaponHud(); }
     if (WWNInput.consumeCycleSub()) { loadout.cycleSub(); updateWeaponHud(); }
     if (WWNInput.consumeCycleGadget()) { loadout.cycleGadget(); updateWeaponHud(); }
+    if (WWNInput.consumeCycleSecret && WWNInput.consumeCycleSecret()) {
+      var ul0 = window.WWNSecret ? WWNSecret.getUnlockedList() : [];
+      if (ul0.length) { secretIdx = (secretIdx + 1) % ul0.length; updateSecretHud(); }
+    }
     if (WWNSecret) {
       WWNSecret.tryResolve().then(function (effect) {
-        if (effect && player.alive) { WWNSecret.applyEffect(effect, player, combat); cyberTint = 2.2; scoreBoard.add(25, "secret"); }
+        if (!effect) return;
+        cyberTint = 1.2; scoreBoard.add(15, "unlock"); updateSecretHud(); pushKillFeed("特殊武装を解放");
       });
     }
     fireMainCd = Math.max(0, fireMainCd - dt);
     fireSubCd = Math.max(0, fireSubCd - dt);
     fireGadgetCd = Math.max(0, fireGadgetCd - dt);
+    secretCd = Math.max(0, secretCd - dt);
     loadout.update(dt);
     if (player.alive) {
       var mainW = WWNWeapons[loadout.mainId()];
@@ -131,10 +178,22 @@
       if (WWNInput.consumeFireGadget() && fireGadgetCd <= 0) {
         combat.useGadget(player, loadout, now); fireGadgetCd = 0.25;
       }
+      if (WWNInput.consumeFireSecret && WWNInput.consumeFireSecret() && secretCd <= 0 && window.WWNSecret) {
+        var ul = WWNSecret.getUnlockedList();
+        if (ul.length) {
+          var sid = ul[secretIdx % ul.length];
+          var api = { spawnAlly: function (n) { spawnAllyBots(n); } };
+          if (WWNSecret.applyEffect(sid, player, combat, api)) {
+            secretCd = 3.5; cyberTint = 1.5;
+            pushKillFeed("特殊: " + (WWNSecret.getMeta(sid).name || sid));
+          }
+        }
+      }
     }
-    // Always drive local ship from local input only
+    player.stealthed = loadout.isStealthed(now);
     player.update(dt, flight, boost, empBlocked);
-    for (var i = 0; i < aiList.length; i++) aiList[i].update(dt, player, combat, now);
+    var allEntities = aiList.concat(netSync.getRemotes());
+    for (var i = 0; i < aiList.length; i++) aiList[i].update(dt, player, combat, now, allEntities);
     mapHazards.update(dt, player, combat, scoreApi());
     scoreBoard.update(dt);
     if (player.alive && player.hp <= 0) {
@@ -148,10 +207,11 @@
     aiList.forEach(function (bot) {
       if (bot.alive && bot.hp <= 0) {
         bot.alive = false; combat.spawnParticle(bot.x, bot.y, "#ff2d95", 24, 180);
-        camera.shake = Math.max(camera.shake, 5); pushKillFeed(bot.username + " 撃墜 +100"); scoreBoard.onKill();
+        camera.shake = Math.max(camera.shake, 5);
+        pushKillFeed(bot.username + " 撃墜 +100"); scoreBoard.onKill();
         setTimeout(function () {
           if (!active) return;
-          bot.alive = true; bot.hp = WWNConfig.HP_MAX;
+          bot.alive = true; bot.hp = WWNConfig.HP_MAX * 0.7;
           var half = WWNConfig.WORLD_SIZE * 0.4;
           bot.x = (Math.random() - 0.5) * half; bot.y = (Math.random() - 0.5) * half;
         }, 3500);
@@ -159,7 +219,10 @@
     });
     camera.follow(player, dt); netSync.updateRemotes(dt);
     WWNCombatUpdate.update(combat, dt, player, aiList.concat(netSync.getRemotes()), loadout, now);
-    if (gameMode === "online") netSync.update(dt, player, loadout, combat);
+    if (gameMode === "online") {
+      netSync.update(dt, player, loadout, combat);
+      if (window.WWNRoom && WWNRoom.ensureMesh && Math.random() < 0.02) WWNRoom.ensureMesh();
+    }
     if (cyberTint > 0) cyberTint = Math.max(0, cyberTint - dt);
     if (els.gadgetHint) {
       var gid = loadout.gadgetId(), w = WWNWeapons[gid], lines = [];
@@ -178,6 +241,7 @@
       } else els.borderWarn.classList.remove("show");
     }
     if (els.hudHp) els.hudHp.style.width = (player.hp / C.HP_MAX) * 100 + "%";
+    if (els.hudHpText) els.hudHpText.textContent = Math.round(player.hp) + " / " + C.HP_MAX;
     if (els.hudBoost) { els.hudBoost.style.width = (player.boost / C.BOOST_MAX) * 100 + "%"; els.hudBoost.classList.toggle("draining", player.boosting); }
     if (els.hudSpeed) els.hudSpeed.textContent = Math.round(player.speed) + " u/s";
     if (els.hudCoord) els.hudCoord.textContent = Math.round(player.x) + " , " + Math.round(player.y);
@@ -185,7 +249,7 @@
     if (els.hudHeat) els.hudHeat.style.width = Math.min(100, loadout.heat) + "%";
     if (els.hudEnergy) els.hudEnergy.style.width = Math.min(100, loadout.energy) + "%";
     if (els.hudAmmo) {
-      var sid = loadout.subId(), am = loadout.ammo[sid];
+      var sid2 = loadout.subId(), am = loadout.ammo[sid2];
       els.hudAmmo.textContent = am != null ? "サブ残弾: " + am : "";
     }
     if (els.hudScore) els.hudScore.textContent = "PT " + scoreBoard.points;
