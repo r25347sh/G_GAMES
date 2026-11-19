@@ -12,12 +12,19 @@
       this.cd[id] = 0;
     }, this);
   }
-  WeaponLoadout.prototype.mainId = function () { return global.WWNWeaponOrder.main[this.mainIdx]; };
-  WeaponLoadout.prototype.subId = function () { return global.WWNWeaponOrder.sub[this.subIdx]; };
-  WeaponLoadout.prototype.gadgetId = function () { return global.WWNWeaponOrder.gadget[this.gadgetIdx]; };
-  WeaponLoadout.prototype.cycleMain = function () { this.mainIdx = (this.mainIdx + 1) % global.WWNWeaponOrder.main.length; };
-  WeaponLoadout.prototype.cycleSub = function () { this.subIdx = (this.subIdx + 1) % global.WWNWeaponOrder.sub.length; };
-  WeaponLoadout.prototype.cycleGadget = function () { this.gadgetIdx = (this.gadgetIdx + 1) % global.WWNWeaponOrder.gadget.length; };
+  WeaponLoadout.prototype._order = function () {
+    return global.WWNWeaponOrder || {
+      main: ["vulcan", "laser", "plasma"],
+      sub: ["missile", "cluster", "emp"],
+      gadget: ["mine", "stealth", "chaff", "decoy"],
+    };
+  };
+  WeaponLoadout.prototype.mainId = function () { return this._order().main[this.mainIdx] || "vulcan"; };
+  WeaponLoadout.prototype.subId = function () { return this._order().sub[this.subIdx] || "missile"; };
+  WeaponLoadout.prototype.gadgetId = function () { return this._order().gadget[this.gadgetIdx] || "mine"; };
+  WeaponLoadout.prototype.cycleMain = function () { var o = this._order().main; this.mainIdx = (this.mainIdx + 1) % o.length; };
+  WeaponLoadout.prototype.cycleSub = function () { var o = this._order().sub; this.subIdx = (this.subIdx + 1) % o.length; };
+  WeaponLoadout.prototype.cycleGadget = function () { var o = this._order().gadget; this.gadgetIdx = (this.gadgetIdx + 1) % o.length; };
   WeaponLoadout.prototype.update = function (dt) {
     var W = global.WWNWeapons;
     if (this.overheated) {
@@ -35,7 +42,10 @@
       if (self.ammo[id] < w.ammoMax) {
         self._ammoAcc[id] = (self._ammoAcc[id] || 0) + dt;
         var need = (w.reload || 8) / Math.max(1, w.ammoMax);
-        if (self._ammoAcc[id] >= need) { self._ammoAcc[id] = 0; self.ammo[id]++; }
+        if (self._ammoAcc[id] >= need) {
+          self._ammoAcc[id] = 0;
+          self.ammo[id]++;
+        }
       }
     });
   };
