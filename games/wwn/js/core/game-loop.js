@@ -9,6 +9,7 @@
     this.fps = 0;
     this._frames = 0;
     this._fpsT = 0;
+    this.lastError = null;
   }
   GameLoop.prototype.start = function () {
     if (this.running) return;
@@ -20,8 +21,15 @@
       var dt = (now - self._last) / 1000;
       self._last = now;
       if (dt > 0.05) dt = 0.05;
-      self.update(dt);
-      self.render();
+      if (dt < 0) dt = 0.016;
+      try { self.update(dt); } catch (e) {
+        self.lastError = e;
+        if (typeof console !== "undefined") console.error("[WWN update]", e);
+      }
+      try { self.render(); } catch (e) {
+        self.lastError = e;
+        if (typeof console !== "undefined") console.error("[WWN render]", e);
+      }
       self._frames++;
       self._fpsT += dt;
       if (self._fpsT >= 0.5) {
