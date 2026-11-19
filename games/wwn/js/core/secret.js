@@ -1,6 +1,5 @@
 /**
- * Hash-gated unlocks. No plaintext in SECRET_HASHES table.
- * Generate: crypto.subtle.digest SHA-256 of the phrase → hex.
+ * Hash-gated unlocks. SECRET_HASHES holds production hex only (no plaintext).
  */
 (function (global) {
   "use strict";
@@ -20,6 +19,8 @@
     storm: { name: "ストームブレイカー", slot: "main" },
     neonblade: { name: "ネオンブレイド", slot: "sub" },
     warp: { name: "ワープドライブ", slot: "gadget" },
+    wingman: { name: "味方召喚", slot: "gadget" },
+    squadron: { name: "小隊展開", slot: "gadget" },
   };
   async function sha256Hex(str) {
     var buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
@@ -29,7 +30,8 @@
     var pairs = [
       ["orbitallaser", "orbital"], ["blackholecore", "blackhole"], ["ghostwing", "overdrive"],
       ["miragefleet", "mirage"], ["cyberstorm", "cyber"], ["voidcannon", "voidcannon"],
-      ["phoenixkit", "phoenix"], ["stormbreaker", "storm"], ["neonblade", "neonblade"], ["warpdrive", "warp"],
+      ["phoenixkit", "phoenix"], ["stormbreaker", "storm"], ["neonblade", "neonblade"],
+      ["warpdrive", "warp"], ["wingman", "wingman"], ["squadron", "squadron"],
     ];
     for (var i = 0; i < pairs.length; i++) hashToEffect[await sha256Hex(pairs[i][0])] = pairs[i][1];
     Object.keys(SECRET_HASHES).forEach(function (h) { hashToEffect[h] = SECRET_HASHES[h]; });
@@ -55,31 +57,31 @@
     return null;
   }
   function _unlock(effectId) {
-    var first = !unlocked[effectId];
-    unlocked[effectId] = true;
+    var first = !unlocked[effectId]; unlocked[effectId] = true;
     if (first) listeners.forEach(function (fn) { try { fn(effectId, EFFECT_META[effectId]); } catch (_) {} });
     return effectId;
   }
-  function applyEffect(effectId, player, combat) {
-    if (!combat || !player) return false;
-    if (effectId === "orbital") { combat.spawnOrbital(player); return true; }
-    if (effectId === "blackhole") { if (combat.spawnBlackHole) combat.spawnBlackHole(player); return true; }
-    if (effectId === "overdrive") {
+  function applyEffect(effectId, player, combat, api) {
+    if (!player) return false;
+    api = api || {};
+    if (effectId === "orbital" && combat) { combat.spawnOrbital(player); return true; }
+    if (effectId === "blackhole" && combat && combat.spawnBlackHole) { combat.spawnBlackHole(player); return true; }
+    if (effectId === "overdrive" && combat) {
       player.boost = global.WWNConfig.BOOST_MAX;
       player.hp = Math.min(global.WWNConfig.HP_MAX, player.hp + 40);
       combat.spawnParticle(player.x, player.y, "#00f5ff", 30, 200); return true;
     }
-    if (effectId === "mirage") {
+    if (effectId === "mirage" && combat) {
       var w = global.WWNWeapons.decoy;
       for (var i = 0; i < 3; i++) if (combat._spawnDecoy) combat._spawnDecoy(player, w);
       return true;
     }
-    if (effectId === "cyber") {
+    if (effectId === "cyber" && combat) {
       combat.events.push({ t: "emp", x: player.x, y: player.y, aoe: 500, duration: 4, dmg: 12, ownerId: player.netId, team: player.team });
       combat.effects.push({ type: "empRing", x: player.x, y: player.y, r: 0, maxR: 500, life: 0.7, color: "#9b5de5" });
       combat.spawnParticle(player.x, player.y, "#9b5de5", 36, 220); return true;
     }
-    if (effectId === "voidcannon") {
+    if (effectId === "voidcannon" && combat) {
       var p = combat.projectiles.acquire();
       p.alive = true; p.type = "plasma";
       p.x = player.x + Math.cos(player.angle) * 24; p.y = player.y + Math.sin(player.angle) * 24;
@@ -91,11 +93,11 @@
       p.radius = 14; p.color = "#5b2cff"; p.targetId = null; p.turn = 0; p.split = 0;
       combat.spawnParticle(p.x, p.y, "#5b2cff", 16, 100); return true;
     }
-    if (effectId === "phoenix") {
+    if (effectId === "phoenix" && combat) {
       player.hp = global.WWNConfig.HP_MAX; player.boost = global.WWNConfig.BOOST_MAX;
       combat.spawnParticle(player.x, player.y, "#ff6bb5", 40, 200); return true;
     }
-    if (effectId === "storm") {
+    if (effectId === "storm" && combat) {
       for (var s = -3; s <= 3; s++) {
         var sp = combat.projectiles.acquire();
         var ang = player.angle + s * 0.12;
@@ -108,14 +110,24 @@
       }
       return true;
     }
-    if (effectId === "neonblade") {
+    if (effectId === "neonblade" && combat) {
       combat.effects.push({ type: "laser", x: player.x, y: player.y, angle: player.angle, range: 220, dmg: 35, ownerId: player.netId || "local", team: player.team || "NONE", color: "#39ff14", width: 8, life: 0.12 });
       combat.events.push({ t: "laser", x: player.x, y: player.y, angle: player.angle, range: 220, dmg: 35, ownerId: player.netId, team: player.team, color: "#39ff14" });
       return true;
     }
-    if (effectId === "warp") {
+    if (effectId === "warp" && combat) {
       player.x += Math.cos(player.angle) * 320; player.y += Math.sin(player.angle) * 320;
       combat.spawnParticle(player.x, player.y, "#7df9ff", 24, 160); return true;
+    }
+    if (effectId === "wingman" && api.spawnAlly) {
+      api.spawnAlly(1);
+      if (combat) combat.spawnParticle(player.x, player.y, "#4fc3f7", 28, 160);
+      return true;
+    }
+    if (effectId === "squadron" && api.spawnAlly) {
+      api.spawnAlly(3);
+      if (combat) combat.spawnParticle(player.x, player.y, "#4fc3f7", 40, 200);
+      return true;
     }
     return false;
   }
