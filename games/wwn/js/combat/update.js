@@ -47,8 +47,7 @@
           while (diff > Math.PI) diff -= Math.PI * 2;
           while (diff < -Math.PI) diff += Math.PI * 2;
           var maxT = p.turn * dt;
-          if (Math.abs(diff) <= maxT) p.angle = desired;
-          else p.angle += Math.sign(diff) * maxT;
+          if (Math.abs(diff) <= maxT) p.angle = desired; else p.angle += Math.sign(diff) * maxT;
           var spd = Math.hypot(p.vx, p.vy) || 380;
           p.vx = Math.cos(p.angle) * spd; p.vy = Math.sin(p.angle) * spd;
         }
@@ -86,7 +85,23 @@
     combat.projectiles.releaseDead(function (p) { return !p.alive; });
     for (var ei = combat.effects.length - 1; ei >= 0; ei--) {
       var e = combat.effects[ei];
-      if (e.type === "laser" || e.type === "orbital") {
+      if (e.type === "blackhole") {
+        e.life -= dt;
+        for (var bi = 0; bi < targets.length; bi++) {
+          var bt = targets[bi];
+          if (!bt || bt.hp <= 0) continue;
+          if (bt.netId === e.ownerId) continue;
+          var bdx = e.x - bt.x, bdy = e.y - bt.y;
+          var bd = Math.hypot(bdx, bdy) || 1;
+          if (bd < (e.radius || 160)) {
+            var pull = (e.pull || 400) * dt / bd;
+            bt.vx += (bdx / bd) * pull;
+            bt.vy += (bdy / bd) * pull;
+            if (bd < 50) applyDamage(bt, (e.dmg || 8) * dt, e.team, e.ownerId);
+          }
+        }
+        if (e.life <= 0) combat.effects.splice(ei, 1);
+      } else if (e.type === "laser" || e.type === "orbital") {
         e.life -= dt;
         var range = e.range || 700;
         var x2 = e.x + Math.cos(e.angle) * range, y2 = e.y + Math.sin(e.angle) * range;
