@@ -26,4 +26,5 @@
 .kill-line{margin-bottom:.25rem;text-shadow:0 1px 4px #000}
 #respawn-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(6,4,26,.55);font-size:1.4rem;font-weight:600;color:#ff2d95}
 #respawn-overlay.hidden,#result-overlay.hidden{display:none!important}
+.gadget-hint{position:absolute;left:50%;bottom:max(8.2rem,env(safe-area-inset-bottom));transform:translateX(-50%);font-size:.72rem;color:rgba(0,245,255,.7);background:rgba(8,6,20,.55);padding:.25rem .7rem;border-radius:999px;border:1px solid rgba(0,245,255,.15)}
 body.in-game{overflow:hidden}
