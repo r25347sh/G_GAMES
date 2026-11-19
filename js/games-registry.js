@@ -7,10 +7,10 @@
     {
       id: "wwn",
       title: "第n次世界大戦",
-      description: "見下ろし型2D空中戦。ドッグファイト＆タクティカルバトル。カスタムルーム / オープン乱戦対応。",
+      description: "見下ろし型2D空中戦。ドッグファイト＆タクティカルバトル。カスタムルーム / オープン乱戦対応。武装10種・リアルタイム同期。",
       path: "games/wwn/index.html",
-      status: "wip",
-      statusLabel: "Step4 完了",
+      status: "ready",
+      statusLabel: "公開中（PLAYABLE）",
       icon: "✈️",
       highlight: true,
     },
@@ -34,27 +34,14 @@
       const statusClass =
         g.status === "ready" ? "status-ready" : g.status === "wip" ? "status-wip" : "status-soon";
       const action = g.path
-        ? '<a href="' +
-          g.path +
-          '" class="btn btn-primary" style="margin-top:1.1rem;font-size:0.88rem;">' +
-          (g.status === "ready" ? "プレイ" : "ロビーへ入る") +
-          "</a>"
+        ? '<a href="' + g.path + '" class="btn btn-primary" style="margin-top:1.1rem;font-size:0.88rem;">' +
+          (g.status === "ready" ? "プレイ" : "ロビーへ入る") + "</a>"
         : "";
       article.innerHTML =
-        '<div class="card-icon">' +
-        g.icon +
-        "</div>" +
-        "<h3>" +
-        escapeHtml(g.title) +
-        "</h3>" +
-        "<p>" +
-        escapeHtml(g.description) +
-        "</p>" +
-        '<span class="status ' +
-        statusClass +
-        '">' +
-        escapeHtml(g.statusLabel) +
-        "</span>" +
+        '<div class="card-icon">' + g.icon + "</div>" +
+        "<h3>" + escapeHtml(g.title) + "</h3>" +
+        "<p>" + escapeHtml(g.description) + "</p>" +
+        '<span class="status ' + statusClass + '">' + escapeHtml(g.statusLabel) + "</span>" +
         action;
       container.appendChild(article);
     });
