@@ -3,9 +3,8 @@
   function WeaponLoadout() {
     this.mainIdx = 0; this.subIdx = 0; this.gadgetIdx = 0;
     this.heat = 0; this.energy = 100; this.overheated = false;
-    this.ammo = {}; this.cd = {};
+    this.ammo = {}; this.cd = {}; this._ammoAcc = {};
     this.stealthUntil = 0; this.chaffUntil = 0; this.empUntil = 0;
-    this.lockTarget = null; this.lockProgress = 0;
     var W = global.WWNWeapons;
     Object.keys(W).forEach(function (id) {
       var w = W[id];
@@ -22,14 +21,30 @@
   WeaponLoadout.prototype.update = function (dt) {
     var W = global.WWNWeapons;
     if (this.overheated) {
-      this.heat = Math.max(0, this.heat - 35 * dt);
+      this.heat = Math.max(0, this.heat - 40 * dt);
       if (this.heat <= 0) this.overheated = false;
-    } else this.heat = Math.max(0, this.heat - (W.vulcan.cool || 20) * dt);
-    this.energy = Math.min(100, this.energy + 12 * dt);
+    } else this.heat = Math.max(0, this.heat - (W.vulcan.cool || 22) * dt);
+    this.energy = Math.min(100, this.energy + 16 * dt);
     var self = this;
     Object.keys(this.cd).forEach(function (id) {
       if (self.cd[id] > 0) self.cd[id] = Math.max(0, self.cd[id] - dt);
     });
+    Object.keys(this.ammo).forEach(function (id) {
+      var w = W[id];
+      if (!w || w.ammoMax == null) return;
+      if (self.ammo[id] < w.ammoMax) {
+        self._ammoAcc[id] = (self._ammoAcc[id] || 0) + dt;
+        var need = (w.reload || 8) / Math.max(1, w.ammoMax);
+        if (self._ammoAcc[id] >= need) { self._ammoAcc[id] = 0; self.ammo[id]++; }
+      }
+    });
+  };
+  WeaponLoadout.prototype.refillAmmo = function () {
+    var W = global.WWNWeapons, self = this;
+    Object.keys(this.ammo).forEach(function (id) {
+      if (W[id] && W[id].ammoMax != null) self.ammo[id] = W[id].ammoMax;
+    });
+    this.energy = 100; this.heat = 0; this.overheated = false;
   };
   WeaponLoadout.prototype.isStealthed = function (now) { return now < this.stealthUntil; };
   WeaponLoadout.prototype.hasChaff = function (now) { return now < this.chaffUntil; };
