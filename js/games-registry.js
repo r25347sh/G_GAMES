@@ -31,22 +31,40 @@
     GAMES.forEach(function (g) {
       const article = document.createElement("article");
       article.className = "card" + (g.highlight ? " card-wwn" : "");
-      const statusClass = g.status === "ready" ? "status-ready" : g.status === "wip" ? "status-wip" : "status-soon";
+      const statusClass =
+        g.status === "ready" ? "status-ready" : g.status === "wip" ? "status-wip" : "status-soon";
       const action = g.path
-        ? '<a href="' + g.path + '" class="btn btn-primary" style="margin-top:1.1rem;font-size:0.88rem;">' +
-          (g.status === "ready" ? "プレイ" : "ロビーへ入る") + "</a>"
+        ? '<a href="' +
+          g.path +
+          '" class="btn btn-primary" style="margin-top:1.1rem;font-size:0.88rem;">' +
+          (g.status === "ready" ? "プレイ" : "ロビーへ入る") +
+          "</a>"
         : "";
       article.innerHTML =
-        '<div class="card-icon">' + g.icon + "</div>" +
-        "<h3>" + escapeHtml(g.title) + "</h3>" +
-        "<p>" + escapeHtml(g.description) + "</p>" +
-        '<span class="status ' + statusClass + '">' + escapeHtml(g.statusLabel) + "</span>" +
+        '<div class="card-icon">' +
+        g.icon +
+        "</div>" +
+        "<h3>" +
+        escapeHtml(g.title) +
+        "</h3>" +
+        "<p>" +
+        escapeHtml(g.description) +
+        "</p>" +
+        '<span class="status ' +
+        statusClass +
+        '">' +
+        escapeHtml(g.statusLabel) +
+        "</span>" +
         action;
       container.appendChild(article);
     });
   }
   function escapeHtml(s) {
-    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
   }
   global.GGamesRegistry = { GAMES: GAMES, renderCards: renderCards };
 })(typeof window !== "undefined" ? window : globalThis);
