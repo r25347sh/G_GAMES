@@ -21,6 +21,7 @@
   <script src="js/combat/update.js" defer></script>
   <script src="js/entities/player.js" defer></script>
   <script src="js/entities/remote-player.js" defer></script>
+  <script src="js/entities/ai.js" defer></script>
   <script src="js/render/world.js" defer></script>
   <script src="js/render/combat-draw.js" defer></script>
   <script src="js/render/minimap.js" defer></script>
@@ -34,19 +35,96 @@
       <h1>第n次世界大戦</h1>
       <p>見下ろし型2D空中戦 · ロビー</p>
     </header>
+    <div class="panel guide-panel" id="guide-panel">
+      <div class="panel-title">操作ガイド</div>
+      <div class="guide-grid">
+        <div>
+          <h4>機体操作</h4>
+          <ul>
+            <li><kbd>A</kbd> / <kbd>←</kbd> … 左回転のみ</li>
+            <li><kbd>D</kbd> / <kbd>→</kbd> … 右回転のみ</li>
+            <li><kbd>↑</kbd> … 前進（加速）</li>
+            <li><kbd>S</kbd> / <kbd>↓</kbd> … 後退（通常より遅い）</li>
+            <li><kbd>B</kbd> … ブースト（前進中に効果大）</li>
+            <li>画面左タッチ … 仮想スティック（左右＝回転・上下＝前後）</li>
+          </ul>
+        </div>
+        <div>
+          <h4>武装キー</h4>
+          <ul>
+            <li><kbd>1</kbd> 切替 / <kbd>Q</kbd> 使用 … メイン</li>
+            <li><kbd>2</kbd> 切替 / <kbd>W</kbd> 使用 … サブ</li>
+            <li><kbd>3</kbd> 切替 / <kbd>E</kbd> 使用 … ガジェット</li>
+            <li>右下タッチ … メイン連射（モバイル）</li>
+          </ul>
+        </div>
+        <div>
+          <h4>メイン武装</h4>
+          <ul>
+            <li><strong>バルカン</strong> … 連射。ヒート上昇でオーバーヒートすると一時射撃不可。自然冷却。</li>
+            <li><strong>レーザー</strong> … 瞬時着弾ビーム。エネルギー消費・自動回復。</li>
+            <li><strong>プラズマ</strong> … 低速弾＋着弾時AoE爆風。エネルギー大消費。</li>
+          </ul>
+        </div>
+        <div>
+          <h4>サブ武装</h4>
+          <ul>
+            <li><strong>追尾ミサイル</strong> … 射程内敵を誘導。残弾制。</li>
+            <li><strong>クラスター</strong> … 空中分裂子弾。残弾制。</li>
+            <li><strong>EMPパルス</strong> … 周囲の操作・誘導・ブーストを一時麻痺。残弾制。</li>
+          </ul>
+        </div>
+        <div>
+          <h4>ガジェット（使用可否）</h4>
+          <ul>
+            <li><strong>空中機雷</strong> … 後方設置。アーム後に近接起爆。残弾＋CD。CD中は不可。</li>
+            <li><strong>ステルス</strong> … 一定時間半透明＆敵ミニマップ非表示。CDのみ（残弾なし）。CD中は不可。</li>
+            <li><strong>チャフ</strong> … 短時間、誘導を阻害。残弾＋CD。</li>
+            <li><strong>デコイ</strong> … 偽機影を放出。残弾＋CD。</li>
+            <li><strong>共通</strong> … EMP麻痺中はガジェット使用不可。状態は画面下ヒントに表示。</li>
+          </ul>
+        </div>
+        <div>
+          <h4>HUD</h4>
+          <ul>
+            <li>Hull … 耐久。0で撃破→自動リスポーン</li>
+            <li>Boost / Heat / Energy … 各ゲージ</li>
+            <li>ミニマップ … 自機(金)・味方(シアン)・敵(ピンク)・機雷・デコイ</li>
+          </ul>
+        </div>
+      </div>
+      <button type="button" class="btn btn-ghost" id="btn-toggle-guide" style="width:100%;margin-top:0.75rem;">ガイドを折りたたむ</button>
+    </div>
     <div class="open-banner">
       <h3>オープン乱戦ワールド</h3>
       <p>公式常設ルームへワンクリック参加。途中参加・自動リスポーン対応。</p>
       <button type="button" class="btn btn-primary" id="btn-open" style="width:100%;">オープンワールドに参加</button>
     </div>
+    <div class="panel" id="cpu-panel">
+      <div class="panel-title">CPU対戦</div>
+      <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:0.75rem;">ネットワーク不要。1対1 または 1対多数。</p>
+      <div class="field"><label>CPU数</label>
+        <div class="mode-grid" id="cpu-count-grid">
+          <button type="button" class="mode-btn active" data-cpu="1">1対1</button>
+          <button type="button" class="mode-btn" data-cpu="3">1対3</button>
+          <button type="button" class="mode-btn" data-cpu="5">1対5</button>
+          <button type="button" class="mode-btn" data-cpu="8">1対8</button>
+        </div></div>
+      <div class="field"><label>難易度</label>
+        <div class="mode-grid" id="cpu-diff-grid">
+          <button type="button" class="mode-btn" data-diff="easy">Easy</button>
+          <button type="button" class="mode-btn active" data-diff="normal">Normal</button>
+          <button type="button" class="mode-btn" data-diff="hard">Hard</button>
+        </div></div>
+      <button type="button" class="btn btn-primary" id="btn-cpu-start" style="width:100%;">CPU戦を開始</button>
+    </div>
     <div class="panel" id="form-panel">
-      <div class="panel-title">ルーム設定</div>
+      <div class="panel-title">ルーム設定（オンライン）</div>
       <div class="field"><label for="username">ユーザー名（必須）</label>
         <input type="text" id="username" placeholder="例: AcePilot" maxlength="24">
         <p class="hint">半角英数字・ハイフン・アンダースコア（2〜24文字）</p></div>
       <div class="field"><label for="room-name">ルーム名（必須）</label>
-        <input type="text" id="room-name" placeholder="例: SkyBattle01" maxlength="24">
-        <p class="hint">同じルーム名＋キーでマッチング</p></div>
+        <input type="text" id="room-name" placeholder="例: SkyBattle01" maxlength="24"></div>
       <div class="field"><label for="room-key">ルームキー（任意）</label>
         <input type="password" id="room-key" placeholder="未入力でもOK" maxlength="32"></div>
       <div class="field"><label>対戦形式</label>
@@ -67,20 +145,17 @@
         <div class="mode-grid">
           <button type="button" class="mode-btn team-red-btn" data-team="RED">RED</button>
           <button type="button" class="mode-btn team-blue-btn" data-team="BLUE">BLUE</button>
-        </div>
-      </div>
+        </div></div>
       <div class="panel-title">プレイヤー</div>
       <ul class="player-list" id="player-list"></ul>
       <div class="actions">
         <button type="button" class="btn btn-primary" id="btn-sortie">出撃する</button>
-        <button type="button" class="btn btn-ghost" id="btn-solo">ソロ練習（オフライン）</button>
         <button type="button" class="btn btn-ghost" id="btn-leave">退出する</button>
-        <p style="font-size:0.8rem;color:var(--text-muted);text-align:center;margin-top:0.5rem;">WASD移動 · Shiftブースト · J射撃 · Kサブ · Lガジェット · 1/2/3切替</p>
       </div>
     </div>
     <div class="panel" id="solo-panel" style="margin-top:0.5rem;">
       <div class="panel-title">ソロ練習</div>
-      <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:0.9rem;">接続なしで操作・武装を確認できます。</p>
+      <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:0.9rem;">敵なしで操作感を確認できます。</p>
       <button type="button" class="btn btn-ghost" id="btn-solo-top" style="width:100%;">ソロで飛び立つ</button>
     </div>
   </div>
@@ -110,8 +185,9 @@
         <div class="wep-slot"><span class="wep-key">2</span><span id="weapon-sub">追尾ミサイル</span></div>
         <div class="wep-slot"><span class="wep-key">3</span><span id="weapon-gadget">空中機雷</span></div>
       </div>
+      <div id="gadget-hint" class="gadget-hint">使用可能</div>
       <div class="hud-bottom">
-        <div class="hud-help">WASD · 移動　Shift · ブースト<br>J · メイン　K · サブ　L · ガジェット<br>1/2/3 · 武装切替　右下タッチ · 射撃</div>
+        <div class="hud-help">A/D 回転 · ↑ 前進 · S 後退 · B ブースト<br>Q メイン · W サブ · E ガジェット · 1/2/3 切替</div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.5rem;">
           <canvas id="minimap-canvas" class="minimap-canvas" width="120" height="120"></canvas>
           <div class="hud-meta" id="hud-fps" style="opacity:0.5;">— fps</div>
