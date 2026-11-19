@@ -6,23 +6,29 @@ G⁵ Portal デザイン準拠のブラウザ P2P ゲームポータル。
 
 ```
 G_GAMES/
-├── index.html
+├── index.html              # ホーム（games-registry から動的描画）
 ├── css/style.css
-├── js/main.js
+├── js/
+│   ├── main.js
+│   └── games-registry.js   # ゲーム一覧の単一ソース
+├── .github/workflows/deploy.yml
+├── .gitignore / .gitattributes / .nojekyll
 └── games/
-    └── wwn/          # 第n次世界大戦
+    └── wwn/                # 第n次世界大戦
 ```
 
-## ゲーム
+## ゲーム追加手順（競合ゼロ）
 
-| ID  | 名前           | 状態      |
-|-----|----------------|-----------|
-| wwn | 第n次世界大戦  | Step 3 完了 |
+1. `games/<id>/` にゲームを配置
+2. `js/games-registry.js` の `GAMES` 配列に1エントリ追加
+3. `index.html` は編集しない
+
+## デプロイ
+
+`main` への push で GitHub Pages へ自動デプロイ（concurrency 制御付き）。
 
 ## 技術方針
 
 - ビルド不要・静的ホスティング
-- P2P: PeerJS（personal + MASTER デュアル）
-- ホストマイグレーション: 参加順 + staggered claim
-- フルメッシュ接続
-- デザイン: G5PORTAL 完全準拠
+- P2P: PeerJS（personal + MASTER）
+- ホストマイグレーション + フルメッシュ
