@@ -5,12 +5,12 @@
   var els = {
     formPanel: $("#form-panel"), connectedPanel: $("#connected-panel"),
     username: $("#username"), roomName: $("#room-name"), roomKey: $("#room-key"),
-    modeBtns: $$(".mode-btn"), btnJoin: $("#btn-join"), btnOpen: $("#btn-open"),
-    btnLeave: $("#btn-leave"), statusDot: $("#status-dot"), statusText: $("#status-text"),
+    btnJoin: $("#btn-join"), btnOpen: $("#btn-open"), btnLeave: $("#btn-leave"),
+    statusDot: $("#status-dot"), statusText: $("#status-text"),
     ownerBadge: $("#owner-badge"), ownerName: $("#owner-name"), playerList: $("#player-list"),
     teamPanel: $("#team-panel"), toast: $("#toast"),
   };
-  var currentMode = "1v1";
+  var currentMode = "1v1", cpuCount = 1, cpuDiff = "normal";
   function showToast(msg, isError) {
     var t = els.toast; if (!t) return;
     t.textContent = msg; t.classList.toggle("error", !!isError); t.classList.add("show");
@@ -22,8 +22,8 @@
   }
   function setMode(mode) {
     currentMode = mode;
-    els.modeBtns.forEach(function (btn) {
-      if (btn.dataset.mode) btn.classList.toggle("active", btn.dataset.mode === mode);
+    document.querySelectorAll("[data-mode]").forEach(function (btn) {
+      btn.classList.toggle("active", btn.dataset.mode === mode);
     });
     if (!window.WWNRoom) return;
     if (mode === "open") {
@@ -42,7 +42,8 @@
   }
   function showForm() {
     els.connectedPanel.classList.add("hidden"); els.formPanel.classList.remove("hidden");
-    els.ownerBadge.classList.add("hidden"); if (els.teamPanel) els.teamPanel.classList.add("hidden");
+    els.ownerBadge.classList.add("hidden");
+    if (els.teamPanel) els.teamPanel.classList.add("hidden");
     setStatus("", "未接続"); renderPlayers([]);
   }
   function updateTeamPanel() {
@@ -67,24 +68,19 @@
         teamBadge = '<span class="tag ' + (p.team === "RED" ? "team-red" : "team-blue") + '">' + p.team + "</span>";
       }
       var ownerTag = p.isOwner ? '<span class="tag">オーナー</span>' : "";
-      li.innerHTML = "<span>" + escapeHtml(p.username) + (p.username === me ? "（あなた）" : "") + "</span><span class=\"tags\">" + teamBadge + ownerTag + "</span>";
+      li.innerHTML = "<span>" + escapeHtml(p.username) + (p.username === me ? "（あなた）" : "") +
+        '</span><span class="tags">' + teamBadge + ownerTag + "</span>";
       els.playerList.appendChild(li);
     });
   }
   function escapeHtml(s) {
-    return String(s)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
   function bindRoomEvents() {
     if (!window.WWNRoom) return;
     WWNRoom.on("owner", function (name) {
       if (name) {
-        els.ownerName.textContent = name;
-        els.ownerBadge.classList.remove("hidden");
+        els.ownerName.textContent = name; els.ownerBadge.classList.remove("hidden");
         var st = WWNRoom.getState();
         setStatus("online", st && st.isOwner ? "ルームオーナーとして接続中" : "ルームに参加中");
       }
@@ -98,74 +94,76 @@
   }
   async function doJoin() {
     if (!window.WWNRoom) { showToast("通信モジュール未読込", true); return; }
-    var username = els.username.value.trim();
-    var roomName = els.roomName.value.trim();
-    var roomKey = els.roomKey.value.trim();
+    var username = els.username.value.trim(), roomName = els.roomName.value.trim(), roomKey = els.roomKey.value.trim();
     var errU = WWNRoom.validateName(username, "ユーザー名"); if (errU) { showToast(errU, true); return; }
     var errR = WWNRoom.validateName(roomName, "ルーム名"); if (errR) { showToast(errR, true); return; }
     els.btnJoin.disabled = true; if (els.btnOpen) els.btnOpen.disabled = true;
     setStatus("connecting", "接続中…");
     try {
-      var result = await WWNRoom.joinOrCreate({
-        username: username, roomName: roomName, roomKey: roomKey, mode: currentMode
-      });
+      var result = await WWNRoom.joinOrCreate({ username: username, roomName: roomName, roomKey: roomKey, mode: currentMode });
       showConnected(result.isOwner, result.ownerName || username);
       renderPlayers(WWNRoom.getPlayerList());
       showToast(result.isOwner ? "ルームを作成しました（オーナー）" : "ルームに参加しました");
     } catch (e) {
-      console.error(e);
-      setStatus("error", "接続失敗");
-      showToast(e.message || "接続に失敗しました", true);
-      showForm();
+      console.error(e); setStatus("error", "接続失敗"); showToast(e.message || "接続に失敗しました", true); showForm();
     } finally {
-      els.btnJoin.disabled = false;
-      if (els.btnOpen) els.btnOpen.disabled = false;
+      els.btnJoin.disabled = false; if (els.btnOpen) els.btnOpen.disabled = false;
     }
   }
   async function doOpenWorld() {
     setMode("open");
-    if (!els.username.value.trim()) {
-      showToast("先にユーザー名を入力してください", true);
-      els.username.focus();
-      return;
-    }
-    els.roomName.value = WWNRoom.OPEN_ROOM_NAME;
-    els.roomKey.value = "";
-    await doJoin();
+    if (!els.username.value.trim()) { showToast("先にユーザー名を入力してください", true); els.username.focus(); return; }
+    els.roomName.value = WWNRoom.OPEN_ROOM_NAME; els.roomKey.value = ""; await doJoin();
   }
-  function doLeave() {
-    if (WWNRoom) WWNRoom.leave();
-    showForm();
-    showToast("ルームを退出しました");
-  }
-  function launchGame() {
-    if (window.WWNGame) window.WWNGame.start();
+  function doLeave() { if (WWNRoom) WWNRoom.leave(); showForm(); showToast("ルームを退出しました"); }
+  function launchOnline() { if (window.WWNGame) window.WWNGame.start({ mode: "online" }); }
+  function launchSolo() { if (window.WWNGame) window.WWNGame.start({ mode: "solo" }); }
+  function launchCpu() {
+    if (window.WWNGame) window.WWNGame.start({ mode: "cpu", cpuCount: cpuCount, difficulty: cpuDiff });
   }
   function init() {
-    els.modeBtns.forEach(function (btn) {
-      if (btn.dataset.mode) btn.addEventListener("click", function () { setMode(btn.dataset.mode); });
+    document.querySelectorAll("[data-mode]").forEach(function (btn) {
+      btn.addEventListener("click", function () { setMode(btn.dataset.mode); });
     });
     setMode("1v1");
+    document.querySelectorAll("[data-cpu]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        cpuCount = parseInt(btn.dataset.cpu, 10) || 1;
+        document.querySelectorAll("[data-cpu]").forEach(function (b) { b.classList.toggle("active", b === btn); });
+      });
+    });
+    document.querySelectorAll("[data-diff]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        cpuDiff = btn.dataset.diff || "normal";
+        document.querySelectorAll("[data-diff]").forEach(function (b) { b.classList.toggle("active", b === btn); });
+      });
+    });
     if (els.btnJoin) els.btnJoin.addEventListener("click", doJoin);
     if (els.btnOpen) els.btnOpen.addEventListener("click", doOpenWorld);
     if (els.btnLeave) els.btnLeave.addEventListener("click", doLeave);
-    ["btn-sortie", "btn-solo", "btn-solo-top"].forEach(function (id) {
-      var b = document.getElementById(id);
-      if (b) b.addEventListener("click", launchGame);
-    });
-    $$("[data-team]").forEach(function (btn) {
+    var btnSortie = document.getElementById("btn-sortie"); if (btnSortie) btnSortie.addEventListener("click", launchOnline);
+    var btnSolo = document.getElementById("btn-solo-top"); if (btnSolo) btnSolo.addEventListener("click", launchSolo);
+    var btnCpu = document.getElementById("btn-cpu-start"); if (btnCpu) btnCpu.addEventListener("click", launchCpu);
+    var btnGuide = document.getElementById("btn-toggle-guide");
+    var guidePanel = document.getElementById("guide-panel");
+    if (btnGuide && guidePanel) {
+      btnGuide.addEventListener("click", function () {
+        var body = guidePanel.querySelector(".guide-grid");
+        if (!body) return;
+        var hidden = body.style.display === "none";
+        body.style.display = hidden ? "" : "none";
+        btnGuide.textContent = hidden ? "ガイドを折りたたむ" : "操作ガイドを表示";
+      });
+    }
+    document.querySelectorAll("[data-team]").forEach(function (btn) {
       btn.addEventListener("click", function () {
-        if (WWNRoom && WWNRoom.setTeam) {
-          WWNRoom.setTeam(btn.dataset.team);
-          showToast("チームを " + btn.dataset.team + " に変更");
-        }
+        if (WWNRoom && WWNRoom.setTeam) { WWNRoom.setTeam(btn.dataset.team); showToast("チームを " + btn.dataset.team + " に変更"); }
       });
     });
     [els.username, els.roomName, els.roomKey].forEach(function (input) {
       if (input) input.addEventListener("keydown", function (e) { if (e.key === "Enter") doJoin(); });
     });
-    bindRoomEvents();
-    setStatus("", "未接続");
+    bindRoomEvents(); setStatus("", "未接続");
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
