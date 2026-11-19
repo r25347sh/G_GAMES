@@ -7,8 +7,8 @@
   var stick = { active: false, id: null, ox: 0, oy: 0, dx: 0, dy: 0, maxR: 56 };
   function bind(targetCanvas) {
     canvas = targetCanvas;
-    window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("keyup", onKeyUp, true);
     window.addEventListener("blur", clearKeys);
     window.addEventListener("keypress", onKeyPress);
     if (canvas) {
@@ -20,8 +20,8 @@
     }
   }
   function unbind() {
-    window.removeEventListener("keydown", onKeyDown);
-    window.removeEventListener("keyup", onKeyUp);
+    window.removeEventListener("keydown", onKeyDown, true);
+    window.removeEventListener("keyup", onKeyUp, true);
     window.removeEventListener("blur", clearKeys);
     window.removeEventListener("keypress", onKeyPress);
   }
@@ -41,9 +41,7 @@
     if (px < rect.width * 0.42) {
       stick.active = true; stick.id = e.pointerId; stick.ox = px; stick.oy = py; stick.dx = 0; stick.dy = 0;
       try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
-    } else if (px > rect.width * 0.62 && py > rect.height * 0.52) {
-      fireMainHold = true;
-    }
+    } else if (px > rect.width * 0.55) fireMainHold = true;
   }
   function onPointerMove(e) {
     if (!canvas || !stick.active || e.pointerId !== stick.id) return;
@@ -64,21 +62,19 @@
     var turn = 0, thrust = 0;
     if (keys["KeyA"] || keys["ArrowLeft"]) turn -= 1;
     if (keys["KeyD"] || keys["ArrowRight"]) turn += 1;
-    if (keys["ArrowUp"]) thrust += 1;
+    if (keys["KeyW"] || keys["ArrowUp"]) thrust += 1;
     if (keys["KeyS"] || keys["ArrowDown"]) thrust -= 1;
     if (stick.active) { turn += stick.dx; thrust += -stick.dy; }
-    turn = Math.max(-1, Math.min(1, turn));
-    thrust = Math.max(-1, Math.min(1, thrust));
-    return { turn: turn, thrust: thrust };
+    return { turn: Math.max(-1, Math.min(1, turn)), thrust: Math.max(-1, Math.min(1, thrust)) };
   }
-  function isBoost() { return !!keys["KeyB"]; }
-  function consumeFireMain() { return !!(fireMainHold || keys["KeyQ"]); }
+  function isBoost() { return !!(keys["KeyB"] || keys["ShiftLeft"] || keys["ShiftRight"]); }
+  function consumeFireMain() { return !!(fireMainHold || keys["KeyQ"] || keys["Space"]); }
   function consumeFireSub() {
-    if (just["KeyW"]) { just["KeyW"] = false; return true; }
+    if (just["KeyF"] || just["KeyR"]) { just["KeyF"] = false; just["KeyR"] = false; return true; }
     return false;
   }
   function consumeFireGadget() {
-    if (just["KeyE"]) { just["KeyE"] = false; return true; }
+    if (just["KeyE"] || just["KeyG"]) { just["KeyE"] = false; just["KeyG"] = false; return true; }
     return false;
   }
   function consumeCycleMain() { if (just["Digit1"]) { just["Digit1"] = false; return true; } return false; }
