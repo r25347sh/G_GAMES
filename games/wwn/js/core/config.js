@@ -1,8 +1,8 @@
 (function (global) {
   "use strict";
   global.WWNConfig = {
-    WORLD_SIZE: 6000,
-    BORDER_WARN: 400,
+    WORLD_SIZE: 12000,
+    BORDER_WARN: 500,
     MAX_SPEED: 440,
     ACCEL: 560,
     DRAG: 1.9,
@@ -37,49 +37,41 @@
     },
     plasma: {
       id: "plasma", slot: "main", name: "プラズマ",
-      dmg: 24, rate: 1.2, speed: 400, life: 1.5, aoe: 85, energy: 38, energyMax: 100, energyRegen: 11,
-      color: "#9b5de5", radius: 10,
+      dmg: 28, rate: 1.2, speed: 420, life: 1.6, heat: 28, cool: 18, overheat: 100,
+      color: "#c77dff", radius: 10, aoe: 70,
     },
     missile: {
       id: "missile", slot: "sub", name: "追尾ミサイル",
-      dmg: 32, rate: 0.55, speed: 360, life: 3.2, lockRange: 820, turn: 3.4, ammo: 5, ammoMax: 5, reload: 10,
-      color: "#ff2d95", radius: 5,
+      dmg: 22, speed: 380, life: 3.2, turn: 2.8, ammoMax: 6, reload: 5.5,
+      color: "#ff6b6b", radius: 5, lockRange: 700,
     },
     cluster: {
-      id: "cluster", slot: "sub", name: "クラスター",
-      dmg: 12, rate: 0.9, speed: 320, life: 2.2, splits: 6, aoe: 55, ammo: 4, ammoMax: 4, reload: 10,
-      color: "#ff8c42", radius: 7,
+      id: "cluster", slot: "sub", name: "クラスター爆弾",
+      dmg: 10, speed: 300, life: 1.8, ammoMax: 4, reload: 6,
+      color: "#ffa94d", radius: 6, split: 5, aoe: 40,
     },
     emp: {
       id: "emp", slot: "sub", name: "EMPパルス",
-      dmg: 6, rate: 0.3, life: 0.55, aoe: 240, duration: 2.8, ammo: 2, ammoMax: 2, reload: 14,
-      color: "#7df9ff", radius: 0,
+      dmg: 8, aoe: 260, duration: 3.2, ammoMax: 2, reload: 10,
+      color: "#9b5de5",
     },
     mine: {
       id: "mine", slot: "gadget", name: "空中機雷",
-      dmg: 45, rate: 0.5, aoe: 70, armTime: 0.8, ammo: 5, ammoMax: 5, reload: 6,
-      color: "#ff6b6b", radius: 12,
+      dmg: 35, radius: 28, life: 25, ammoMax: 4, reload: 7, trigger: 70,
+      color: "#ffd700",
     },
     stealth: {
-      id: "stealth", slot: "gadget", name: "ステルス",
-      duration: 5, cooldown: 14, energy: 40,
-      color: "#a0a0ff",
+      id: "stealth", slot: "gadget", name: "ステルス迷彩",
+      duration: 5.5, cd: 14, color: "#a0aec0",
     },
     chaff: {
-      id: "chaff", slot: "gadget", name: "チャフ",
-      duration: 3.2, cooldown: 7, ammo: 4, ammoMax: 4, reload: 6,
-      color: "#e8e8e8",
+      id: "chaff", slot: "gadget", name: "チャフ・フレア",
+      duration: 2.5, cd: 8, aoe: 200, color: "#ffe066",
     },
     decoy: {
       id: "decoy", slot: "gadget", name: "デコイ",
-      duration: 10, cooldown: 10, ammo: 3, ammoMax: 3, reload: 8, speed: 220,
-      color: "#ffb347", radius: 16,
+      duration: 10, speed: 180, radius: 16, ammoMax: 3, reload: 9,
+      color: "#ffb347",
     },
-  };
-
-  global.WWNWeaponOrder = {
-    main: ["vulcan", "laser", "plasma"],
-    sub: ["missile", "cluster", "emp"],
-    gadget: ["mine", "stealth", "chaff", "decoy"],
   };
 })(typeof window !== "undefined" ? window : globalThis);
