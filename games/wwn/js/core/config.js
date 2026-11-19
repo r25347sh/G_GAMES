@@ -74,4 +74,10 @@
       color: "#ffb347",
     },
   };
+
+  global.WWNWeaponOrder = {
+    main: ["vulcan", "laser", "plasma"],
+    sub: ["missile", "cluster", "emp"],
+    gadget: ["mine", "stealth", "chaff", "decoy"],
+  };
 })(typeof window !== "undefined" ? window : globalThis);
