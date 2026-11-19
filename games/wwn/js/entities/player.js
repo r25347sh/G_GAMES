@@ -3,35 +3,36 @@
   function Player(x, y) {
     var C = global.WWNConfig;
     this.x = x; this.y = y; this.vx = 0; this.vy = 0;
-    this.angle = -Math.PI / 2; this.targetAngle = this.angle; this.speed = 0;
+    this.angle = -Math.PI / 2; this.speed = 0;
     this.hp = C.HP_MAX; this.boost = C.BOOST_MAX; this.boosting = false; this.trail = [];
     this.team = "NONE"; this.netId = "local"; this.username = "You"; this.radius = C.SHIP_RADIUS;
     this.empUntil = 0; this.lastHitBy = null; this.alive = true; this.respawnTimer = 0;
     this.kills = 0; this.deaths = 0;
   }
-  Player.prototype.update = function (dt, axis, boostHeld, empBlocked) {
+  Player.prototype.update = function (dt, flight, boostHeld, empBlocked) {
     var C = global.WWNConfig;
     if (!this.alive) { this.respawnTimer -= dt; return; }
-    var inputMag = Math.hypot(axis.x, axis.y);
-    if (empBlocked) { inputMag *= 0.35; boostHeld = false; }
-    if (inputMag > 0.06) this.targetAngle = Math.atan2(axis.y, axis.x);
-    var diff = this.targetAngle - this.angle;
-    while (diff > Math.PI) diff -= Math.PI * 2;
-    while (diff < -Math.PI) diff += Math.PI * 2;
-    var turnSpeed = C.TURN_RATE * (this.boosting ? 1.2 : 1) * (0.55 + 0.45 * inputMag);
-    var maxTurn = turnSpeed * dt;
-    if (Math.abs(diff) <= maxTurn) this.angle = this.targetAngle;
-    else this.angle += Math.sign(diff) * maxTurn;
+    var turn = flight.turn || 0, thrust = flight.thrust || 0;
+    if (empBlocked) { turn *= 0.4; thrust *= 0.35; boostHeld = false; }
+    this.angle += turn * C.TURN_RATE * (this.boosting ? 1.15 : 1) * dt;
     this.boosting = false;
-    var accel = C.ACCEL * inputMag;
-    if (boostHeld && this.boost > 0 && inputMag > 0.04) {
-      this.boosting = true; accel *= C.BOOST_MULT;
-      this.boost = Math.max(0, this.boost - C.BOOST_DRAIN * dt);
+    var accel = 0;
+    if (thrust > 0.05) {
+      accel = C.ACCEL * thrust;
+      if (boostHeld && this.boost > 0) {
+        this.boosting = true; accel *= C.BOOST_MULT;
+        this.boost = Math.max(0, this.boost - C.BOOST_DRAIN * dt);
+      } else this.boost = Math.min(C.BOOST_MAX, this.boost + C.BOOST_REGEN * dt);
+    } else if (thrust < -0.05) {
+      accel = C.ACCEL * thrust * 0.45;
+      this.boost = Math.min(C.BOOST_MAX, this.boost + C.BOOST_REGEN * dt);
     } else this.boost = Math.min(C.BOOST_MAX, this.boost + C.BOOST_REGEN * dt);
-    this.vx += Math.cos(this.angle) * accel * dt; this.vy += Math.sin(this.angle) * accel * dt;
+    this.vx += Math.cos(this.angle) * accel * dt;
+    this.vy += Math.sin(this.angle) * accel * dt;
     this.vx *= Math.exp(-C.DRAG * dt); this.vy *= Math.exp(-C.DRAG * dt);
     var sp = Math.hypot(this.vx, this.vy);
     var maxSp = C.MAX_SPEED * (this.boosting ? C.BOOST_MULT * 0.88 : 1);
+    if (thrust < -0.05) maxSp *= 0.5;
     if (sp > maxSp) { this.vx = (this.vx / sp) * maxSp; this.vy = (this.vy / sp) * maxSp; }
     this.speed = Math.hypot(this.vx, this.vy);
     this.x += this.vx * dt; this.y += this.vy * dt;
