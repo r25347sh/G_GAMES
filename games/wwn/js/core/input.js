@@ -70,7 +70,7 @@
   function isBoost() { return !!(keys["KeyB"] || keys["ShiftLeft"] || keys["ShiftRight"]); }
   function consumeFireMain() { return !!(fireMainHold || keys["KeyQ"] || keys["Space"]); }
   function consumeFireSub() {
-    if (just["KeyF"] || just["KeyR"]) { just["KeyF"] = false; just["KeyR"] = false; return true; }
+    if (just["KeyF"]) { just["KeyF"] = false; return true; }
     return false;
   }
   function consumeFireGadget() {
@@ -80,6 +80,8 @@
   function consumeCycleMain() { if (just["Digit1"]) { just["Digit1"] = false; return true; } return false; }
   function consumeCycleSub() { if (just["Digit2"]) { just["Digit2"] = false; return true; } return false; }
   function consumeCycleGadget() { if (just["Digit3"]) { just["Digit3"] = false; return true; } return false; }
+  function consumeCycleSecret() { if (just["Digit4"]) { just["Digit4"] = false; return true; } return false; }
+  function consumeFireSecret() { if (just["KeyR"]) { just["KeyR"] = false; return true; } return false; }
   function getStick() { return stick; }
   function endFrame() { Object.keys(just).forEach(function (k) { just[k] = false; }); }
   function getAxis() { var f = getFlight(); return { x: f.turn, y: -f.thrust }; }
@@ -87,6 +89,7 @@
     bind: bind, unbind: unbind, getFlight: getFlight, getAxis: getAxis, isBoost: isBoost,
     getStick: getStick, consumeFireMain: consumeFireMain, consumeFireSub: consumeFireSub,
     consumeFireGadget: consumeFireGadget, consumeCycleMain: consumeCycleMain,
-    consumeCycleSub: consumeCycleSub, consumeCycleGadget: consumeCycleGadget, endFrame: endFrame,
+    consumeCycleSub: consumeCycleSub, consumeCycleGadget: consumeCycleGadget,
+    consumeCycleSecret: consumeCycleSecret, consumeFireSecret: consumeFireSecret, endFrame: endFrame,
   };
 })(typeof window !== "undefined" ? window : globalThis);
