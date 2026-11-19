@@ -1,19 +1,20 @@
 (function () {
   "use strict";
   var styleCounter = 0;
-
   function patchAi() {
     if (!window.WWNAiPilot || WWNAiPilot.__styled) return;
     var Orig = WWNAiPilot;
     function Wrapped(id, difficulty, styleIndex) {
       if (styleIndex == null) styleIndex = styleCounter++;
       Orig.call(this, id, difficulty, styleIndex);
+      if (arguments.length >= 1 && String(id).indexOf("cpu-auto") === 0) {
+        this.openWeak = true; this.hp = 50; this.preferDist = 450;
+      }
     }
     Wrapped.prototype = Orig.prototype;
     Wrapped.__styled = true;
     window.WWNAiPilot = Wrapped;
   }
-
   function patchDecoy() {
     if (!window.WWNCombat || !WWNCombat.prototype || WWNCombat.prototype.__decoyPatched) return;
     WWNCombat.prototype._spawnDecoy = function (player, w) {
@@ -27,22 +28,15 @@
       var spd = (w.speed || 180) * (0.85 + Math.random() * 0.4);
       d.vx = Math.cos(d.angle) * spd + (player.vx || 0) * 0.5;
       d.vy = Math.sin(d.angle) * spd + (player.vy || 0) * 0.5;
-      d.life = w.duration;
-      d.hp = 35;
-      d.ownerId = player.netId || "local";
-      d.team = player.team || "NONE";
-      d.radius = w.radius || 16;
-      d.turn = (Math.random() - 0.5) * 1.2;
-      this.events.push({
-        t: "decoy", id: d.id, x: d.x, y: d.y, vx: d.vx, vy: d.vy, angle: d.angle,
-        life: d.life, ownerId: d.ownerId, team: d.team, radius: d.radius, hp: d.hp,
-      });
+      d.life = w.duration; d.hp = 35;
+      d.ownerId = player.netId || "local"; d.team = player.team || "NONE";
+      d.radius = w.radius || 16; d.turn = (Math.random() - 0.5) * 1.2;
+      this.events.push({ t: "decoy", id: d.id, x: d.x, y: d.y, vx: d.vx, vy: d.vy, angle: d.angle, life: d.life, ownerId: d.ownerId, team: d.team, radius: d.radius, hp: d.hp });
       this.spawnParticle(d.x, d.y, "#ffb347", 14, 100);
       return d;
     };
     WWNCombat.prototype.__decoyPatched = true;
   }
-
   function patchOpenAutoSortie() {
     var btn = document.getElementById("btn-open");
     if (!btn || btn.__patched) return;
@@ -52,33 +46,40 @@
         try {
           if (window.WWNRoom && WWNRoom.getState && WWNRoom.getState() && WWNRoom.getState().peerId) {
             if (WWNRoom.ensureMesh) WWNRoom.ensureMesh();
-            if (window.WWNGame && !WWNGame.isActive()) {
-              WWNGame.start({ mode: "online" });
-            }
+            if (window.WWNGame && !WWNGame.isActive()) WWNGame.start({ mode: "online" });
           }
         } catch (e) { console.warn(e); }
       }, 800);
     }, true);
   }
-
   function meshKeepalive() {
     try {
-      if (window.WWNGame && WWNGame.isActive && WWNGame.isActive() &&
-          window.WWNRoom && WWNRoom.ensureMesh) {
-        WWNRoom.ensureMesh();
-      }
+      if (window.WWNGame && WWNGame.isActive && WWNGame.isActive() && window.WWNRoom && WWNRoom.ensureMesh) WWNRoom.ensureMesh();
     } catch (_) {}
   }
-
+  function bindSecretLobby() {
+    window.addEventListener("keypress", function (e) {
+      if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;
+      if (window.WWNSecret && e.key && e.key.length === 1) WWNSecret.onKey(e.key);
+    });
+    if (window.WWNSecret && WWNSecret.onUnlock) {
+      WWNSecret.onUnlock(function (id, meta) {
+        var name = (meta && meta.name) || id;
+        var t = document.getElementById("toast");
+        if (t) { t.textContent = "解放: " + name; t.classList.add("show"); setTimeout(function () { t.classList.remove("show"); }, 3200); }
+        var slot = document.getElementById("secret-slot");
+        if (slot) { slot.textContent = name; slot.parentElement.style.opacity = "1"; }
+      });
+    }
+    setInterval(function () {
+      if (!window.WWNSecret) return;
+      WWNSecret.tryResolve();
+    }, 400);
+  }
   function boot() {
-    patchAi();
-    patchDecoy();
-    patchOpenAutoSortie();
+    patchAi(); patchDecoy(); patchOpenAutoSortie(); bindSecretLobby();
     setInterval(meshKeepalive, 3000);
   }
-
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () {
-    setTimeout(boot, 50);
-  });
-  else setTimeout(boot, 50);
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { setTimeout(boot, 80); });
+  else setTimeout(boot, 80);
 })();
