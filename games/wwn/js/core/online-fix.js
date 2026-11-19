@@ -1,46 +1,78 @@
 (function () {
   "use strict";
-  var styleCounter = 0;
-  function patchAi() {
+  var styleCounter = 0, secretIdx = 0, secretCd = 0, lastHpWrite = 0;
+  function patchAiCtor() {
     if (!window.WWNAiPilot || WWNAiPilot.__styled) return;
     var Orig = WWNAiPilot;
     function Wrapped(id, difficulty, styleIndex) {
       if (styleIndex == null) styleIndex = styleCounter++;
       Orig.call(this, id, difficulty, styleIndex);
-      if (arguments.length >= 1 && String(id).indexOf("cpu-auto") === 0) {
-        this.openWeak = true; this.hp = 50; this.preferDist = 450;
-      }
+      if (String(id).indexOf("cpu-auto") === 0) { this.openWeak = true; this.hp = 50; this.preferDist = 450; }
     }
-    Wrapped.prototype = Orig.prototype;
-    Wrapped.__styled = true;
-    window.WWNAiPilot = Wrapped;
+    Wrapped.prototype = Orig.prototype; Wrapped.__styled = true; window.WWNAiPilot = Wrapped;
   }
   function patchDecoy() {
     if (!window.WWNCombat || !WWNCombat.prototype || WWNCombat.prototype.__decoyPatched) return;
     WWNCombat.prototype._spawnDecoy = function (player, w) {
       var d = this.decoys.acquire();
-      d.alive = true;
-      d.id = "decoy-" + (player.netId || "local") + "-" + Math.floor(Math.random() * 1e6);
-      d.x = player.x - Math.cos(player.angle) * 30;
-      d.y = player.y - Math.sin(player.angle) * 30;
+      d.alive = true; d.id = "decoy-" + (player.netId || "local") + "-" + Math.floor(Math.random() * 1e6);
+      d.x = player.x - Math.cos(player.angle) * 30; d.y = player.y - Math.sin(player.angle) * 30;
       var side = Math.random() < 0.5 ? 1 : -1;
       d.angle = player.angle + side * (0.4 + Math.random() * 0.5);
       var spd = (w.speed || 180) * (0.85 + Math.random() * 0.4);
       d.vx = Math.cos(d.angle) * spd + (player.vx || 0) * 0.5;
       d.vy = Math.sin(d.angle) * spd + (player.vy || 0) * 0.5;
-      d.life = w.duration; d.hp = 35;
-      d.ownerId = player.netId || "local"; d.team = player.team || "NONE";
+      d.life = w.duration; d.hp = 35; d.ownerId = player.netId || "local"; d.team = player.team || "NONE";
       d.radius = w.radius || 16; d.turn = (Math.random() - 0.5) * 1.2;
       this.events.push({ t: "decoy", id: d.id, x: d.x, y: d.y, vx: d.vx, vy: d.vy, angle: d.angle, life: d.life, ownerId: d.ownerId, team: d.team, radius: d.radius, hp: d.hp });
-      this.spawnParticle(d.x, d.y, "#ffb347", 14, 100);
-      return d;
+      this.spawnParticle(d.x, d.y, "#ffb347", 14, 100); return d;
     };
     WWNCombat.prototype.__decoyPatched = true;
   }
+  function ensureHpTextEl() {
+    if (document.getElementById("hud-hp-text")) return;
+    var labels = document.querySelectorAll(".hud-label");
+    for (var i = 0; i < labels.length; i++) {
+      if (labels[i].textContent.indexOf("Hull") >= 0) {
+        var span = document.createElement("span");
+        span.id = "hud-hp-text"; span.style.cssText = "float:right;opacity:0.9;"; span.textContent = "100 / 100";
+        labels[i].appendChild(document.createTextNode(" ")); labels[i].appendChild(span); break;
+      }
+    }
+  }
+  function ensureSecretSlot() {
+    if (document.getElementById("secret-slot")) return;
+    var weapons = document.querySelector(".hud-weapons"); if (!weapons) return;
+    var div = document.createElement("div"); div.className = "wep-slot"; div.style.opacity = "0.35";
+    div.innerHTML = '<span class="wep-key">4</span><span id="secret-slot">—</span>'; weapons.appendChild(div);
+  }
+  function updateSecretSlot() {
+    var slot = document.getElementById("secret-slot"); if (!slot || !window.WWNSecret) return;
+    var ul = WWNSecret.getUnlockedList();
+    if (!ul.length) { slot.textContent = "—"; if (slot.parentElement) slot.parentElement.style.opacity = "0.35"; return; }
+    if (secretIdx >= ul.length) secretIdx = 0;
+    slot.textContent = WWNSecret.getMeta(ul[secretIdx]).name;
+    if (slot.parentElement) slot.parentElement.style.opacity = "1";
+  }
+  function toast(msg) {
+    var t = document.getElementById("toast"); if (!t) return;
+    t.textContent = msg; t.classList.add("show"); setTimeout(function () { t.classList.remove("show"); }, 3000);
+  }
+  function bindSecretLobby() {
+    window.addEventListener("keypress", function (e) {
+      if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;
+      if (window.WWNSecret && e.key && e.key.length === 1) WWNSecret.onKey(e.key);
+    });
+    if (window.WWNSecret && WWNSecret.onUnlock) {
+      WWNSecret.onUnlock(function (id, meta) { toast("解放: " + ((meta && meta.name) || id)); updateSecretSlot(); });
+    }
+    setInterval(function () {
+      if (!window.WWNSecret) return;
+      WWNSecret.tryResolve().then(function (effect) { if (effect) updateSecretSlot(); });
+    }, 400);
+  }
   function patchOpenAutoSortie() {
-    var btn = document.getElementById("btn-open");
-    if (!btn || btn.__patched) return;
-    btn.__patched = true;
+    var btn = document.getElementById("btn-open"); if (!btn || btn.__patched) return; btn.__patched = true;
     btn.addEventListener("click", function () {
       setTimeout(function () {
         try {
@@ -57,29 +89,36 @@
       if (window.WWNGame && WWNGame.isActive && WWNGame.isActive() && window.WWNRoom && WWNRoom.ensureMesh) WWNRoom.ensureMesh();
     } catch (_) {}
   }
-  function bindSecretLobby() {
-    window.addEventListener("keypress", function (e) {
-      if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;
-      if (window.WWNSecret && e.key && e.key.length === 1) WWNSecret.onKey(e.key);
-    });
-    if (window.WWNSecret && WWNSecret.onUnlock) {
-      WWNSecret.onUnlock(function (id, meta) {
-        var name = (meta && meta.name) || id;
-        var t = document.getElementById("toast");
-        if (t) { t.textContent = "解放: " + name; t.classList.add("show"); setTimeout(function () { t.classList.remove("show"); }, 3200); }
-        var slot = document.getElementById("secret-slot");
-        if (slot) { slot.textContent = name; slot.parentElement.style.opacity = "1"; }
-      });
+  function softPatchSecretApply() {
+    if (!window.WWNSecret || WWNSecret.__soft) return; WWNSecret.__soft = true;
+    var orig = WWNSecret.applyEffect.bind(WWNSecret);
+    var unlockOnlyUntil = 0;
+    var origResolve = WWNSecret.tryResolve.bind(WWNSecret);
+    WWNSecret.tryResolve = async function () { unlockOnlyUntil = performance.now() + 80; return origResolve(); };
+    WWNSecret.applyEffect = function (id, player, combat) {
+      if (performance.now() < unlockOnlyUntil) return false;
+      return orig(id, player, combat);
+    };
+  }
+  function gameTick() {
+    ensureHpTextEl(); ensureSecretSlot();
+    var hpText = document.getElementById("hud-hp-text");
+    var hpBar = document.getElementById("hud-hp");
+    if (hpText && hpBar && hpBar.style.width && performance.now() - lastHpWrite > 80) {
+      hpText.textContent = Math.round(parseFloat(hpBar.style.width) || 0) + " / 100";
+      lastHpWrite = performance.now();
     }
-    setInterval(function () {
-      if (!window.WWNSecret) return;
-      WWNSecret.tryResolve();
-    }, 400);
+    secretCd = Math.max(0, secretCd - 0.016);
+    if (window.WWNInput && WWNInput.consumeCycleSecret && WWNInput.consumeCycleSecret()) {
+      var ul = window.WWNSecret ? WWNSecret.getUnlockedList() : [];
+      if (ul.length) { secretIdx = (secretIdx + 1) % ul.length; updateSecretSlot(); }
+    }
+    requestAnimationFrame(gameTick);
   }
   function boot() {
-    patchAi(); patchDecoy(); patchOpenAutoSortie(); bindSecretLobby();
-    setInterval(meshKeepalive, 3000);
+    patchAiCtor(); patchDecoy(); patchOpenAutoSortie(); bindSecretLobby(); softPatchSecretApply();
+    setInterval(meshKeepalive, 3000); requestAnimationFrame(gameTick);
   }
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { setTimeout(boot, 80); });
-  else setTimeout(boot, 80);
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { setTimeout(boot, 100); });
+  else setTimeout(boot, 100);
 })();
