@@ -22,8 +22,8 @@
         <div>
           <h4>基本フロー</h4>
           <ul>
-            <li>言語を選びコードを書く</li>
-            <li><kbd>Ctrl</kbd>+<kbd>Enter</kbd> でAIデプロイ</li>
+            <li>ロビーで言語を選択（試合中は変更不可）</li>
+            <li>コードを書いて <kbd>Ctrl</kbd>+<kbd>Enter</kbd> でデプロイ</li>
             <li>相手コードは右側に透けて表示</li>
             <li>読み合いで対策を書く</li>
           </ul>
@@ -32,7 +32,7 @@
           <h4>戦闘</h4>
           <ul>
             <li>推力・旋回・弾・シールド</li>
-            <li>EN と HEAT に注意</li>
+            <li>EN（エネルギー）とHEATに注意</li>
             <li>壁反射あり・直接ダメージ指定禁止</li>
             <li>HP 0 で敗北</li>
           </ul>
@@ -50,29 +50,63 @@
         <div>
           <h4>ヒント</h4>
           <ul>
-            <li>最初は NoviceScript の chase から</li>
+            <li>最初はチュートリアルから</li>
+            <li>CPUはあなたのコードを読んで対策を組む</li>
             <li>連射しすぎるとオーバーヒート</li>
             <li>ドキュメントは HELP / DOCS から</li>
-            <li>シークレットはロビーで入力…</li>
           </ul>
         </div>
       </div>
       <button type="button" class="btn btn-ghost" id="btn-toggle-guide" style="width:100%;margin-top:0.75rem;">ガイドを折りたたむ</button>
     </div>
 
+    <!-- Language selection (lobby only) -->
+    <div class="panel" id="lang-panel">
+      <div class="panel-title">使用言語（試合中は変更不可）</div>
+      <div class="field">
+        <label for="lobbyLangSelect">言語を選択</label>
+        <select id="lobbyLangSelect" style="width:100%;padding:0.55rem 0.75rem;border-radius:8px;background:#0c0a18;border:1px solid #2a2540;color:#e8e6f0;font-family:inherit;">
+          <option value="novice">NoviceScript（初級・推奨）</option>
+          <option value="cyber">CyberScript（標準）</option>
+          <option value="vectra">Vectra（ベクトル軌道）</option>
+          <option value="shadow">ShadowScript（1文字難解）</option>
+          <option value="cyberhack">CyberHack（電子戦）</option>
+          <option value="ctrlworld" id="lobby-opt-ctrlworld" disabled>CtrlWorld（LOCKED）</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Tutorial per language -->
+    <div class="panel" id="tutorial-panel">
+      <div class="panel-title">チュートリアル（各言語）</div>
+      <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:0.75rem;">
+        弱いダミー相手で言語の基本を学べます。コメントの指示に従ってコードを書いてください。
+      </p>
+      <div class="mode-grid" style="grid-template-columns:repeat(auto-fill,minmax(120px,1fr));">
+        <button type="button" class="mode-btn" data-tutorial="novice">Novice</button>
+        <button type="button" class="mode-btn" data-tutorial="cyber">Cyber</button>
+        <button type="button" class="mode-btn" data-tutorial="vectra">Vectra</button>
+        <button type="button" class="mode-btn" data-tutorial="shadow">Shadow</button>
+        <button type="button" class="mode-btn" data-tutorial="cyberhack">CyberHack</button>
+        <button type="button" class="mode-btn hidden" data-tutorial="ctrlworld" id="tut-ctrlworld">CtrlWorld</button>
+      </div>
+    </div>
+
     <div class="panel" id="cpu-panel">
       <div class="panel-title">CPU対戦</div>
-      <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:0.75rem;">相手CPUのコーディング速度（WPM）で難易度が変わります。5段階。</p>
+      <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:0.75rem;">
+        相手CPUはあなたのコードを解析して対策を組みます。WPMが高いほど高速に書き換えます。
+      </p>
       <div class="field">
         <label>難易度（相手WPM）</label>
         <div class="mode-grid" id="diff-grid">
-          <button type="button" class="mode-btn" data-diff="1">Lv1<br><small>20WPM</small></button>
-          <button type="button" class="mode-btn" data-diff="2">Lv2<br><small>40WPM</small></button>
-          <button type="button" class="mode-btn active" data-diff="3">Lv3<br><small>60WPM</small></button>
-          <button type="button" class="mode-btn" data-diff="4">Lv4<br><small>80WPM</small></button>
-          <button type="button" class="mode-btn" data-diff="5">Lv5<br><small>100WPM</small></button>
+          <button type="button" class="mode-btn" data-diff="1">Lv1<br><small>55 WPM</small></button>
+          <button type="button" class="mode-btn" data-diff="2">Lv2<br><small>85 WPM</small></button>
+          <button type="button" class="mode-btn active" data-diff="3">Lv3<br><small>120 WPM</small></button>
+          <button type="button" class="mode-btn" data-diff="4">Lv4<br><small>160 WPM</small></button>
+          <button type="button" class="mode-btn" data-diff="5">Lv5<br><small>210 WPM</small></button>
         </div>
-        <p class="diff-desc" id="diff-desc">標準的な反応速度。バランス型AI。</p>
+        <p class="diff-desc" id="diff-desc">上級。あなたのコードを読んで対策を組む。</p>
       </div>
       <button type="button" class="btn btn-primary" id="btn-cpu-start" style="width:100%;">CPU戦を開始</button>
     </div>
@@ -103,7 +137,9 @@
         <span class="status-dot online"></span>
         <span id="conn-text">接続済み</span>
       </div>
-      <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:0.75rem;">Room: <strong id="conn-room-id">—</strong></p>
+      <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:0.75rem;">
+        Room: <strong id="conn-room-id">—</strong>
+      </p>
       <div class="actions">
         <button type="button" class="btn btn-primary" id="btn-sortie">対戦開始</button>
         <button type="button" class="btn btn-ghost" id="btn-leave">退出する</button>
@@ -111,10 +147,15 @@
     </div>
 
     <div class="panel hidden secret-panel" id="secret-panel">
-      <div class="panel-title">CtrlWorld UNLOCKED <span class="secret-unlocked-badge">SECRET</span></div>
-      <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:0.75rem;">制作者専用言語が解放されました。物理法則干渉コマンドが使用可能です。</p>
+      <div class="panel-title">
+        CtrlWorld UNLOCKED
+        <span class="secret-unlocked-badge">SECRET</span>
+      </div>
+      <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:0.75rem;">
+        制作者専用言語が解放されました。物理法則干渉コマンドが使用可能です。
+      </p>
       <div class="actions">
-        <a class="btn btn-ghost" href="docs/index.html?ctrlworld.md" target="_blank" rel="noopener" style="text-decoration:none;">CtrlWorld 使用方法を見る</a>
+        <a class="btn btn-ghost" id="btn-secret-docs" href="docs/index.html?ctrlworld.md" target="_blank" rel="noopener" style="text-decoration:none;">CtrlWorld 使用方法を見る</a>
       </div>
     </div>
 
@@ -138,11 +179,12 @@
       </div>
       <button type="button" class="btn-sm" id="btn-exit-game">ロビーへ戻る</button>
     </header>
+
     <main class="main-layout">
       <section class="panel">
         <div class="panel-header">
           <h2>YOUR CODE</h2>
-          <select id="langSelect">
+          <select id="langSelect" title="言語はロビーでのみ変更可能">
             <option value="novice">NoviceScript</option>
             <option value="cyber">CyberScript</option>
             <option value="vectra">Vectra</option>
@@ -156,9 +198,10 @@
           <span class="energy-display" id="selfEnergy">EN: 100%</span>
           <span class="heat-display" id="selfHeat">HEAT: 0%</span>
         </div>
-        <textarea id="selfCode" class="code-editor" spellcheck="false" placeholder="// Write AI code... Ctrl+Enter"></textarea>
+        <textarea id="selfCode" class="code-editor" spellcheck="false" placeholder="// コードを書いて Ctrl+Enter でデプロイ（初期は空です）"></textarea>
         <div class="console" id="selfConsole"></div>
       </section>
+
       <section class="panel battlefield-panel">
         <div class="panel-header">
           <h2>BATTLEFIELD</h2>
@@ -186,17 +229,20 @@
           </div>
         </div>
       </section>
+
       <section class="panel">
         <div class="panel-header">
           <h2>ENEMY CODE</h2>
+          <span style="font-size:0.7rem;color:#5a6a82;">Read &amp; Counter</span>
         </div>
         <div class="editor-toolbar">
           <span style="font-size:0.7rem;color:#5a6a82;" id="cpu-wpm-label"></span>
         </div>
-        <textarea id="enemyCode" class="code-editor enemy-code" spellcheck="false" readonly></textarea>
+        <textarea id="enemyCode" class="code-editor enemy-code" spellcheck="false" readonly placeholder="// Enemy / CPU code（最初は空。思考してから書き始めます）"></textarea>
         <div class="console" id="enemyConsole"></div>
       </section>
     </main>
+
     <footer class="game-footer">
       <div class="footer-left">
         <span class="help-toggle" id="helpToggle">[?] LANGUAGE HELP</span>
@@ -204,24 +250,26 @@
       </div>
       <span class="fps-counter" id="fpsCounter">FPS: --</span>
     </footer>
+
     <div class="modal" id="helpModal">
       <div class="modal-content">
-        <button class="modal-close" id="helpClose">×</button>
-        <h2>Language Reference</h2>
-        <div class="help-tabs">
-          <button class="help-tab active" data-lang="novice">Novice</button>
-          <button class="help-tab" data-lang="cyber">Cyber</button>
-          <button class="help-tab" data-lang="vectra">Vectra</button>
-          <button class="help-tab" data-lang="shadow">Shadow</button>
-          <button class="help-tab" data-lang="cyberhack">CyberHack</button>
-          <button class="help-tab secret-tab hidden" data-lang="ctrlworld" id="tab-ctrlworld">CtrlWorld</button>
+        <div class="modal-header">
+          <h3>Language Help</h3>
+          <button type="button" id="helpClose">×</button>
         </div>
-        <div class="help-body" id="helpBody"></div>
+        <div class="help-tabs">
+          <button type="button" class="help-tab active" data-lang="novice">Novice</button>
+          <button type="button" class="help-tab" data-lang="cyber">Cyber</button>
+          <button type="button" class="help-tab" data-lang="vectra">Vectra</button>
+          <button type="button" class="help-tab" data-lang="shadow">Shadow</button>
+          <button type="button" class="help-tab" data-lang="cyberhack">Hack</button>
+          <button type="button" class="help-tab hidden" data-lang="ctrlworld" id="tab-ctrlworld">CtrlWorld</button>
+        </div>
+        <div class="modal-body" id="helpBody"></div>
       </div>
     </div>
   </div>
 
-  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script type="module" src="js/main.js"></script>
 </body>
 </html>
