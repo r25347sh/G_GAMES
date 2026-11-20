@@ -50,7 +50,6 @@
             <li><kbd>W</kbd> / <kbd>↑</kbd> … 前進（加速）</li>
             <li><kbd>S</kbd> / <kbd>↓</kbd> … 後退（遅め）</li>
             <li><kbd>B</kbd> / Shift … ブースト</li>
-            <li>画面左タッチ … 仮想スティック</li>
           </ul>
         </div>
         <div>
@@ -59,22 +58,6 @@
             <li><kbd>1</kbd> 切替 / <kbd>Q</kbd> or <kbd>Space</kbd> … メイン</li>
             <li><kbd>2</kbd> 切替 / <kbd>F</kbd> … サブ</li>
             <li><kbd>3</kbd> 切替 / <kbd>E</kbd> … ガジェット</li>
-            <li>右半分タッチ … メイン連射</li>
-          </ul>
-        </div>
-        <div>
-          <h4>メイン武装</h4>
-          <ul>
-            <li><strong>バルカン</strong> … 拡散連射。ヒート管理必須。</li>
-            <li><strong>レーザー</strong> … 瞬時着弾。エネルギー制。</li>
-            <li><strong>プラズマ</strong> … 爆風AoE。高火力。</li>
-          </ul>
-        </div>
-        <div>
-          <h4>サブ / ガジェット</h4>
-          <ul>
-            <li>ミサイル・クラスター・EMP（残弾は時間で回復）</li>
-            <li>機雷・ステルス・チャフ・デコイ（CD/残弾/EMP中は不可）</li>
           </ul>
         </div>
         <div>
@@ -83,15 +66,6 @@
             <li>小惑星 … 衝突ダメージ。破壊でPT</li>
             <li>緑ゾーン … HP回復 / シアン … ブースト回復</li>
             <li>赤ゾーン … ダメージ / 金ゾーン … スコア</li>
-            <li>アイテム球 … HP・ブースト・弾薬・スコア</li>
-          </ul>
-        </div>
-        <div>
-          <h4>ポイント</h4>
-          <ul>
-            <li>撃破 +100、小惑星 +15、拾得 +50</li>
-            <li>連続撃破でコンボ倍率アップ</li>
-            <li>全モードに弱めCPUが自動配置</li>
           </ul>
         </div>
       </div>
@@ -104,13 +78,14 @@
     </div>
     <div class="panel" id="cpu-panel">
       <div class="panel-title">CPU対戦</div>
-      <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:0.75rem;">1対1〜1対8。難易度選択可。</p>
+      <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:0.75rem;">1対1〜オーバー。難易度選択可。</p>
       <div class="field"><label>CPU数</label>
         <div class="mode-grid">
           <button type="button" class="mode-btn active" data-cpu="1">1対1</button>
           <button type="button" class="mode-btn" data-cpu="3">1対3</button>
           <button type="button" class="mode-btn" data-cpu="5">1対5</button>
           <button type="button" class="mode-btn" data-cpu="8">1対8</button>
+          <button type="button" class="mode-btn" data-cpu="21" data-over="1">オーバー</button>
         </div></div>
       <div class="field"><label>難易度</label>
         <div class="mode-grid">
@@ -156,7 +131,7 @@
     </div>
     <div class="panel" id="solo-panel" style="margin-top:0.5rem;">
       <div class="panel-title">ソロ練習</div>
-      <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:0.9rem;">弱めCPU2体が自動出現します。</p>
+      <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:0.9rem;">弱めCPUが自動配置されます。</p>
       <button type="button" class="btn btn-ghost" id="btn-solo-top" style="width:100%;">ソロで飛び立つ</button>
     </div>
   </div>
