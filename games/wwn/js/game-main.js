@@ -45,15 +45,18 @@
     }
   }
   function spawnAllyBots(count) {
-    count = Math.max(1, Math.min(5, count || 1));
+    var types = ["guardian", "striker", "phantom"];
+    count = Math.max(1, Math.min(3, count || 3));
     for (var i = 0; i < count; i++) {
       try {
-        var bot = new WWNAiPilot("cpu-ally-" + (aiList.length + 1), "normal", aiList.length + i, "ALLY");
+        var typ = types[i % types.length];
+        var bot = new WWNAiPilot("cpu-ally-" + (aiList.length + 1), "normal", i, "ALLY", typ);
         bot.team = player ? player.team : "BLUE";
         bot.group = "ALLY"; bot.isAlly = true; bot.openWeak = false;
         if (player) {
-          bot.x = player.x - Math.cos(player.angle) * (60 + i * 30);
-          bot.y = player.y - Math.sin(player.angle) * (60 + i * 30);
+          var ang = player.angle + Math.PI + (i - 1) * 0.6;
+          bot.x = player.x + Math.cos(ang) * (50 + i * 25);
+          bot.y = player.y + Math.sin(ang) * (50 + i * 25);
           bot.angle = player.angle;
         }
         aiList.push(bot);
@@ -83,7 +86,7 @@
     camera.x = player.x; camera.y = player.y; camera.zoom = 1;
     world = new WWNWorld(); combat = new WWNCombat(); loadout = new WWNWeaponLoadout();
     try { mapHazards = new WWNMapHazards(); }
-    catch (e) { console.error("mapHazards", e); mapHazards = { update: function () {}, draw: function () {} }; }
+    catch (e) { mapHazards = { update: function () {}, draw: function () {} }; }
     scoreBoard = new WWNScoreBoard(); netSync = new WWNNetSync();
     netSync.setLocalId(player.netId);
     netSync.onCombatEvent = function (ev) {
@@ -109,20 +112,28 @@
           netSync._onState({ t: "st", id: p.peerId, x: (Math.random() - 0.5) * 400, y: (Math.random() - 0.5) * 400, vx: 0, vy: 0, a: 0, hp: 100, b: 0, team: p.team || "NONE", st: 0, u: p.username || "Pilot" });
         }
         if (window.WWNRoom && WWNRoom.ensureMesh) WWNRoom.ensureMesh();
-      } catch (e) { console.error("online seed", e); }
+      } catch (e) {}
     }
-    if (gameMode === "cpu") {
-      var n = Math.max(1, Math.min(8, options.cpuCount || 1));
+    if (gameMode === "over") {
+      var overN = Math.max(18, Math.min(24, options.cpuCount || 21));
+      var groupsO = ["G1","G2","G3","G4","G5","G6","G7"];
+      for (var oi = 0; oi < overN; oi++) {
+        try {
+          var ob = new WWNAiPilot("cpu-over-" + (oi + 1), "easy", oi, groupsO[oi % groupsO.length]);
+          ob.openWeak = true; ob.hp *= 0.55; aiList.push(ob);
+        } catch (e) {}
+      }
+    } else if (gameMode === "cpu") {
+      var n = Math.max(1, Math.min(24, options.cpuCount || 1));
       var diff = options.difficulty || "normal";
-      var groups = ["G1", "G2", "G3", "G4", "G5", "G6", "G7"];
+      var groups = ["G1","G2","G3","G4","G5","G6","G7"];
       for (var i = 0; i < n; i++) {
         try { aiList.push(new WWNAiPilot("cpu-" + (i + 1), diff, i, groups[i % groups.length])); }
-        catch (e) { console.error(e); }
+        catch (e) {}
       }
     } else spawnFillerBots();
     resize(); WWNInput.bind(canvas);
     try { canvas.focus(); } catch (_) {}
-    try { window.focus(); } catch (_) {}
     loop = new WWNGameLoop(update, render); loop.start();
     if (els.btnExit) els.btnExit.onclick = stopGame;
     window.addEventListener("resize", resize);
@@ -146,11 +157,10 @@
   }
   function updateWeaponHud() {
     if (!loadout || !window.WWNWeapons) return;
-    var W = WWNWeapons;
     try {
-      if (els.weaponMain) els.weaponMain.textContent = W[loadout.mainId()].name;
-      if (els.weaponSub) els.weaponSub.textContent = W[loadout.subId()].name;
-      if (els.weaponGadget) els.weaponGadget.textContent = W[loadout.gadgetId()].name;
+      if (els.weaponMain) els.weaponMain.textContent = WWNWeapons[loadout.mainId()].name;
+      if (els.weaponSub) els.weaponSub.textContent = WWNWeapons[loadout.subId()].name;
+      if (els.weaponGadget) els.weaponGadget.textContent = WWNWeapons[loadout.gadgetId()].name;
     } catch (_) {}
   }
   function pushKillFeed(text) {
@@ -245,7 +255,8 @@
         if (scoreBoard) scoreBoard.onKill();
         setTimeout(function () {
           if (!active) return;
-          bot.alive = true; bot.hp = WWNConfig.HP_MAX * 0.7;
+          bot.alive = true;
+          bot.hp = bot.hpMax || (WWNConfig.HP_MAX * 0.7);
           var half = WWNConfig.WORLD_SIZE * 0.35;
           bot.x = (Math.random() - 0.5) * half; bot.y = (Math.random() - 0.5) * half;
         }, 3500);
@@ -255,7 +266,7 @@
     try { netSync.updateRemotes(dt); } catch (e) {}
     try {
       if (window.WWNCombatUpdate) WWNCombatUpdate.update(combat, dt, player, aiList.concat(netSync.getRemotes()), loadout, now);
-    } catch (e) { console.error("combatupd", e); }
+    } catch (e) {}
     if (gameMode === "online") {
       try {
         netSync.update(dt, player, loadout, combat);
@@ -314,8 +325,8 @@
     ctx.globalAlpha = 1;
     ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = "#0a0820"; ctx.fillRect(0, 0, w, h);
-    try { if (world) world.draw(ctx, camera); } catch (e) { console.error("world.draw", e); }
-    try { if (mapHazards && mapHazards.draw) mapHazards.draw(ctx, camera); } catch (e) { console.error("hazards.draw", e); }
+    try { if (world) world.draw(ctx, camera); } catch (e) {}
+    try { if (mapHazards && mapHazards.draw) mapHazards.draw(ctx, camera); } catch (e) {}
     try { if (combat && window.WWNCombatDraw) WWNCombatDraw.draw(ctx, camera, combat); } catch (e) {}
     for (var i = 0; i < aiList.length; i++) {
       try { if (aiList[i]) aiList[i].draw(ctx, camera); } catch (e) {}
@@ -331,10 +342,8 @@
       var stl = loadout && loadout.isStealthed ? loadout.isStealthed(now) : false;
       player.draw(ctx, camera, stl);
     } catch (e) {
-      console.error("player.draw", e);
       ctx.fillStyle = "#00f5ff";
       ctx.beginPath(); ctx.arc(w / 2, h / 2, 14, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
     }
     try {
       var stick = WWNInput.getStick();
