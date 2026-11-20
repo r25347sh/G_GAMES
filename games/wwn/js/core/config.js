@@ -57,8 +57,8 @@
     },
     mine: {
       id: "mine", slot: "gadget", name: "空中機雷",
-      dmg: 35, radius: 28, life: 25, ammoMax: 4, reload: 7, trigger: 70,
-      color: "#ffd700",
+      dmg: 32, radius: 11, aoe: 52, armTime: 0.85, life: 22, ammoMax: 4, reload: 7, trigger: 55,
+      color: "#ff6b6b",
     },
     stealth: {
       id: "stealth", slot: "gadget", name: "ステルス迷彩",
