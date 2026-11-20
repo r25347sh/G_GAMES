@@ -16,6 +16,7 @@
   <script src="js/core/camera.js" defer></script>
   <script src="js/core/game-loop.js" defer></script>
   <script src="js/core/secret.js" defer></script>
+  <script src="js/core/terminal.js" defer></script>
   <script src="js/core/score.js" defer></script>
   <script src="js/combat/weapons.js" defer></script>
   <script src="js/combat/combat.js" defer></script>
@@ -39,46 +40,8 @@
       <h1>第n次世界大戦</h1>
       <p>見下ろし型2D空中戦 · ロビー</p>
     </header>
-    <div class="panel guide-panel" id="guide-panel">
-      <div class="panel-title">操作ガイド</div>
-      <div class="guide-grid">
-        <div>
-          <h4>機体操作</h4>
-          <ul>
-            <li><kbd>A</kbd> / <kbd>←</kbd> … 左回転のみ</li>
-            <li><kbd>D</kbd> / <kbd>→</kbd> … 右回転のみ</li>
-            <li><kbd>W</kbd> / <kbd>↑</kbd> … 前進（加速）</li>
-            <li><kbd>S</kbd> / <kbd>↓</kbd> … 後退（遅め）</li>
-            <li><kbd>B</kbd> / Shift … ブースト</li>
-          </ul>
-        </div>
-        <div>
-          <h4>武装キー</h4>
-          <ul>
-            <li><kbd>1</kbd> 切替 / <kbd>Q</kbd> or <kbd>Space</kbd> … メイン</li>
-            <li><kbd>2</kbd> 切替 / <kbd>F</kbd> … サブ</li>
-            <li><kbd>3</kbd> 切替 / <kbd>E</kbd> … ガジェット</li>
-          </ul>
-        </div>
-        <div>
-          <h4>マップギミック</h4>
-          <ul>
-            <li>小惑星 … 衝突ダメージ。破壊でPT</li>
-            <li>緑ゾーン … HP回復 / シアン … ブースト回復</li>
-            <li>赤ゾーン … ダメージ / 金ゾーン … スコア</li>
-          </ul>
-        </div>
-      </div>
-      <button type="button" class="btn btn-ghost" id="btn-toggle-guide" style="width:100%;margin-top:0.75rem;">ガイドを折りたたむ</button>
-    </div>
-    <div class="open-banner">
-      <h3>オープン乱戦ワールド</h3>
-      <p>公式常設ルームへ参加後、自動で出撃します。ユーザー名を先に入力。</p>
-      <button type="button" class="btn btn-primary" id="btn-open" style="width:100%;">オープンワールドに参加</button>
-    </div>
     <div class="panel" id="cpu-panel">
       <div class="panel-title">CPU対戦</div>
-      <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:0.75rem;">1対1〜オーバー。難易度選択可。</p>
       <div class="field"><label>CPU数</label>
         <div class="mode-grid">
           <button type="button" class="mode-btn active" data-cpu="1">1対1</button>
@@ -95,43 +58,38 @@
         </div></div>
       <button type="button" class="btn btn-primary" id="btn-cpu-start" style="width:100%;">CPU戦を開始</button>
     </div>
+    <div class="open-banner">
+      <h3>オープン乱戦ワールド</h3>
+      <button type="button" class="btn btn-primary" id="btn-open" style="width:100%;">オープンワールドに参加</button>
+    </div>
     <div class="panel" id="form-panel">
       <div class="panel-title">ルーム設定（オンライン）</div>
-      <div class="field"><label for="username">ユーザー名（必須）</label>
-        <input type="text" id="username" placeholder="例: AcePilot" maxlength="24"></div>
-      <div class="field"><label for="room-name">ルーム名（必須）</label>
-        <input type="text" id="room-name" placeholder="例: SkyBattle01" maxlength="24"></div>
-      <div class="field"><label for="room-key">ルームキー（任意）</label>
-        <input type="password" id="room-key" placeholder="未入力でもOK" maxlength="32"></div>
-      <div class="field"><label>対戦形式</label>
+      <div class="field"><label for="username">ユーザー名</label>
+        <input type="text" id="username" placeholder="AcePilot" maxlength="24"></div>
+      <div class="field"><label for="room-name">ルーム名</label>
+        <input type="text" id="room-name" placeholder="SkyBattle01" maxlength="24"></div>
+      <div class="field"><label for="room-key">ルームキー</label>
+        <input type="password" id="room-key" maxlength="32"></div>
+      <div class="field"><label>形式</label>
         <div class="mode-grid">
           <button type="button" class="mode-btn active" data-mode="1v1">1 vs 1</button>
-          <button type="button" class="mode-btn" data-mode="team">チーム戦</button>
-          <button type="button" class="mode-btn" data-mode="br">バトルロイヤル</button>
+          <button type="button" class="mode-btn" data-mode="team">チーム</button>
+          <button type="button" class="mode-btn" data-mode="br">BR</button>
           <button type="button" class="mode-btn" data-mode="open">オープン</button>
         </div></div>
-      <div class="actions"><button type="button" class="btn btn-primary" id="btn-join">ルームを作成 / 参加</button></div>
+      <div class="actions"><button type="button" class="btn btn-primary" id="btn-join">作成 / 参加</button></div>
     </div>
     <div class="panel hidden" id="connected-panel">
       <div class="panel-title">接続中</div>
       <div class="status-bar" id="status-bar"><span class="status-dot" id="status-dot"></span><span id="status-text">未接続</span></div>
-      <div class="owner-badge hidden" id="owner-badge">ルームオーナー：<strong id="owner-name">—</strong></div>
-      <div class="hidden" id="team-panel" style="margin-bottom:1rem;">
-        <div class="panel-title" style="margin-bottom:0.6rem;">チーム選択</div>
-        <div class="mode-grid">
-          <button type="button" class="mode-btn team-red-btn" data-team="RED">RED</button>
-          <button type="button" class="mode-btn team-blue-btn" data-team="BLUE">BLUE</button>
-        </div></div>
-      <div class="panel-title">プレイヤー</div>
       <ul class="player-list" id="player-list"></ul>
       <div class="actions">
-        <button type="button" class="btn btn-primary" id="btn-sortie">出撃する</button>
-        <button type="button" class="btn btn-ghost" id="btn-leave">退出する</button>
+        <button type="button" class="btn btn-primary" id="btn-sortie">出撃</button>
+        <button type="button" class="btn btn-ghost" id="btn-leave">退出</button>
       </div>
     </div>
-    <div class="panel" id="solo-panel" style="margin-top:0.5rem;">
-      <div class="panel-title">ソロ練習</div>
-      <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:0.9rem;">弱めCPUが自動配置されます。</p>
+    <div class="panel" id="solo-panel">
+      <div class="panel-title">ソロ</div>
       <button type="button" class="btn btn-ghost" id="btn-solo-top" style="width:100%;">ソロで飛び立つ</button>
     </div>
   </div>
@@ -141,17 +99,17 @@
     <div class="hud">
       <div class="hud-top">
         <div class="hud-panel">
-          <div class="hud-label">Hull</div><div class="bar"><span id="hud-hp"></span></div>
+          <div class="hud-label">Hull <span id="hud-hp-text" style="float:right;">100 / 100</span></div><div class="bar"><span id="hud-hp"></span></div>
           <div class="hud-label">Boost</div><div class="bar"><span id="hud-boost"></span></div>
           <div class="hud-label">Heat</div><div class="bar"><span id="hud-heat"></span></div>
           <div class="hud-label">Energy</div><div class="bar"><span id="hud-energy"></span></div>
         </div>
         <div class="hud-panel">
-          <div class="hud-label">Velocity</div><div class="hud-meta" id="hud-speed">0 u/s</div>
-          <div class="hud-label" style="margin-top:0.35rem;">Coord</div><div class="hud-meta" id="hud-coord">0 , 0</div>
-          <div class="hud-meta" id="hud-ammo" style="margin-top:0.4rem;opacity:0.8;"></div>
-          <div class="hud-meta" id="hud-score" style="margin-top:0.35rem;color:#ffd700;">PT 0</div>
-          <div class="hud-meta" id="hud-combo" style="color:#ff2d95;"></div>
+          <div class="hud-meta" id="hud-speed">0 u/s</div>
+          <div class="hud-meta" id="hud-coord">0 , 0</div>
+          <div class="hud-meta" id="hud-ammo"></div>
+          <div class="hud-meta" id="hud-score" style="color:#ffd700;">PT 0</div>
+          <div class="hud-meta" id="hud-combo"></div>
         </div>
       </div>
       <div id="border-warn">境界接近</div>
@@ -162,13 +120,14 @@
         <div class="wep-slot"><span class="wep-key">1</span><span id="weapon-main">バルカン</span></div>
         <div class="wep-slot"><span class="wep-key">2</span><span id="weapon-sub">追尾ミサイル</span></div>
         <div class="wep-slot"><span class="wep-key">3</span><span id="weapon-gadget">空中機雷</span></div>
+        <div class="wep-slot" style="opacity:0.9;"><span class="wep-key">4</span><span id="secret-slot">—</span></div>
       </div>
       <div id="gadget-hint" class="gadget-hint">Ready</div>
       <div class="hud-bottom">
-        <div class="hud-help">A/D 回転 · W/↑ 前進 · S 後退 · B ブースト<br>Q/Space メイン · F サブ · E ガジェット · 1/2/3 切替</div>
+        <div class="hud-help">A/D 回転 · W 前進 · S 後退 · B ブースト<br>Q メイン · F サブ · E ガジェット · R 特殊 · 1/2/3/4 切替</div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.5rem;">
           <canvas id="minimap-canvas" class="minimap-canvas" width="120" height="120"></canvas>
-          <div class="hud-meta" id="hud-fps" style="opacity:0.5;">— fps</div>
+          <div class="hud-meta" id="hud-fps">— fps</div>
           <button type="button" id="btn-exit-game">ロビーへ戻る</button>
         </div>
       </div>
