@@ -25,6 +25,7 @@
   <script src="js/entities/player.js" defer></script>
   <script src="js/entities/remote-player.js" defer></script>
   <script src="js/entities/ai.js" defer></script>
+  <script src="js/entities/supports.js" defer></script>
   <script src="js/render/world.js" defer></script>
   <script src="js/render/map-hazards.js" defer></script>
   <script src="js/render/combat-draw.js" defer></script>
@@ -63,11 +64,11 @@
       <button type="button" class="btn btn-primary" id="btn-open" style="width:100%;">オープンワールドに参加</button>
     </div>
     <div class="panel" id="form-panel">
-      <div class="panel-title">ルーム設定（オンライン）</div>
+      <div class="panel-title">ルーム設定</div>
       <div class="field"><label for="username">ユーザー名</label>
-        <input type="text" id="username" placeholder="AcePilot" maxlength="24"></div>
+        <input type="text" id="username" maxlength="24"></div>
       <div class="field"><label for="room-name">ルーム名</label>
-        <input type="text" id="room-name" placeholder="SkyBattle01" maxlength="24"></div>
+        <input type="text" id="room-name" maxlength="24"></div>
       <div class="field"><label for="room-key">ルームキー</label>
         <input type="password" id="room-key" maxlength="32"></div>
       <div class="field"><label>形式</label>
@@ -120,7 +121,7 @@
         <div class="wep-slot"><span class="wep-key">1</span><span id="weapon-main">バルカン</span></div>
         <div class="wep-slot"><span class="wep-key">2</span><span id="weapon-sub">追尾ミサイル</span></div>
         <div class="wep-slot"><span class="wep-key">3</span><span id="weapon-gadget">空中機雷</span></div>
-        <div class="wep-slot" style="opacity:0.9;"><span class="wep-key">4</span><span id="secret-slot">—</span></div>
+        <div class="wep-slot"><span class="wep-key">4</span><span id="secret-slot">—</span></div>
       </div>
       <div id="gadget-hint" class="gadget-hint">Ready</div>
       <div class="hud-bottom">
