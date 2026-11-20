@@ -93,21 +93,32 @@
     if (!player || !effectId) return false;
     api = api || {};
     var C = global.WWNConfig || { HP_MAX: 100, BOOST_MAX: 100, MAX_SPEED: 400 };
+    try {
+      if (global.WWNSupportBridge && WWNSupportBridge.apiFor) {
+        var b = WWNSupportBridge.apiFor(player, combat, global.__wwnAiList || [], global.__wwnNetSync, global.__wwnLoadout, api.spawnAlly);
+        for (var bk in b) if (api[bk] == null) api[bk] = b[bk];
+      }
+    } catch (_) {}
+    global.__wwnPlayer = player;
+    global.__wwnCombat = combat;
     function dmgRay(ang, range, dmg) {
-      if (api.damageRay) { api.damageRay(player.x, player.y, ang, range, dmg, 28, player); return; }
+      if (api.damageRay) { api.damageRay(player.x, player.y, ang, range, dmg, 30, player); return; }
       ((api.getEnemies && api.getEnemies()) || []).forEach(function (t) {
-        if (!t || !t.alive) return;
+        if (!t || !t.hp) return;
         var dx = t.x - player.x, dy = t.y - player.y, dist = Math.hypot(dx, dy);
         if (dist > range) return;
         var diff = Math.atan2(dy, dx) - ang;
         while (diff > Math.PI) diff -= Math.PI * 2;
         while (diff < -Math.PI) diff += Math.PI * 2;
-        if (Math.abs(diff) < 0.15) t.hp = Math.max(0, t.hp - dmg);
+        if (Math.abs(diff) < 0.18) t.hp = Math.max(0, t.hp - dmg);
       });
     }
     function pushFx(fx) { if (combat && combat.effects) combat.effects.push(fx); }
     function boom(c, n) { if (combat && combat.spawnParticle) combat.spawnParticle(player.x, player.y, c || "#00f5ff", n || 24, 160); }
-    if (effectId === "orbital") { pushFx({ type: "orbitalBeam", x: player.x, y: player.y, angle: player.angle, range: 1400, life: 0.9, width: 22, color: "#ff3366" }); dmgRay(player.angle, 1400, 60); boom("#ff3366", 40); return true; }
+    if (effectId === "orbital") {
+      pushFx({ type: "orbitalBeam", x: player.x, y: player.y, angle: player.angle, range: 1400, life: 0.9, width: 22, color: "#ff3366" });
+      dmgRay(player.angle, 1400, 60); boom("#ff3366", 40); return true;
+    }
     if (effectId === "blackhole" || effectId === "gravity") {
       var dist = effectId === "gravity" ? 120 : 180;
       pushFx({ type: "blackhole", x: player.x + Math.cos(player.angle) * dist, y: player.y + Math.sin(player.angle) * dist, r: 20, maxR: 180, life: 5, pull: 450, dmg: 0.3, ownerId: player.netId, team: player.team });
