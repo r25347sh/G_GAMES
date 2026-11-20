@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>G_GAMES - Code Duel | WebRTC P2P Programming Battle</title>
+  <meta name="description" content="リアルタイム・プログラミング対戦ゲーム。5つのオリジナル言語で機体AIを記述し、P2Pで戦う。" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@500;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div id="app">
+    <header class="header">
+      <div class="logo">
+        <span class="logo-text">G_GAMES</span>
+        <span class="logo-sub">CODE DUEL</span>
+      </div>
+      <div class="status-bar">
+        <div class="connection-status" id="connectionStatus">
+          <span class="dot"></span>
+          <span class="text">DISCONNECTED</span>
+        </div>
+        <div class="room-info" id="roomInfo">Room: ---</div>
+      </div>
+      <div class="header-actions">
+        <button id="btnHost" class="btn btn-primary">HOST</button>
+        <button id="btnJoin" class="btn btn-secondary">JOIN</button>
+        <input type="text" id="roomIdInput" placeholder="Room ID" maxlength="8" class="room-input" />
+      </div>
+    </header>
+
+    <main class="main-layout">
+      <section class="panel editor-panel self-panel">
+        <div class="panel-header">
+          <h2>YOUR CODE</h2>
+          <div class="lang-select-wrap">
+            <label for="langSelect">Language</label>
+            <select id="langSelect">
+              <option value="novice">NoviceScript (初級)</option>
+              <option value="cyber">CyberScript</option>
+              <option value="vectra">Vectra</option>
+              <option value="shadow">ShadowScript</option>
+              <option value="cyberhack">CyberHack</option>
+              <option value="ctrlworld" disabled>CtrlWorld (LOCKED)</option>
+            </select>
+          </div>
+        </div>
+        <div class="editor-toolbar">
+          <button id="btnRun" class="btn btn-run" title="Ctrl + Enter">▶ RUN (Ctrl+Enter)</button>
+          <button id="btnStop" class="btn btn-stop">■ STOP</button>
+          <span class="energy-display" id="selfEnergy">EN: 100%</span>
+          <span class="heat-display" id="selfHeat">HEAT: 0%</span>
+        </div>
+        <textarea id="selfCode" class="code-editor" spellcheck="false" placeholder="// Select a language and write your AI code...\n// Press Ctrl + Enter to deploy"></textarea>
+        <div class="console" id="selfConsole"></div>
+      </section>
+
+      <section class="panel battlefield-panel">
+        <div class="panel-header">
+          <h2>BATTLEFIELD</h2>
+          <div class="match-info">
+            <span id="matchTimer">00:00</span>
+            <span id="matchStatus">WAITING</span>
+          </div>
+        </div>
+        <div class="canvas-wrap">
+          <canvas id="gameCanvas" width="800" height="600"></canvas>
+          <div class="overlay" id="overlay">
+            <div class="overlay-content">
+              <h1 id="overlayTitle">CODE DUEL</h1>
+              <p id="overlayMessage">Host or Join a room to start</p>
+            </div>
+          </div>
+        </div>
+        <div class="battlefield-footer">
+          <div class="hp-bar self-hp">
+            <span class="label">YOU</span>
+            <div class="bar"><div class="fill" id="selfHpFill"></div></div>
+            <span class="value" id="selfHpValue">100</span>
+          </div>
+          <div class="hp-bar enemy-hp">
+            <span class="label">ENEMY</span>
+            <div class="bar"><div class="fill" id="enemyHpFill"></div></div>
+            <span class="value" id="enemyHpValue">100</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel editor-panel enemy-panel">
+        <div class="panel-header">
+          <h2>ENEMY CODE</h2>
+          <span class="enemy-lang" id="enemyLang">---</span>
+        </div>
+        <div class="editor-toolbar enemy-toolbar">
+          <span class="hint">Read & Counter</span>
+        </div>
+        <textarea id="enemyCode" class="code-editor enemy-code" spellcheck="false" readonly placeholder="// Enemy code will appear here in real-time..."></textarea>
+        <div class="console enemy-console" id="enemyConsole"></div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-left">
+        <div class="help-toggle" id="helpToggle">[?] LANGUAGE HELP</div>
+        <a class="docs-link" href="docs/index.html" target="_blank" rel="noopener">[DOCS] 説明書</a>
+        <a class="docs-link" href="../../index.html">[HOME] ポータル</a>
+      </div>
+      <div class="fps-counter" id="fpsCounter">FPS: --</div>
+    </footer>
+
+    <div class="modal" id="helpModal">
+      <div class="modal-content">
+        <button class="modal-close" id="helpClose">×</button>
+        <h2>Language Reference</h2>
+        <div class="help-tabs">
+          <button class="help-tab active" data-lang="novice">NoviceScript</button>
+          <button class="help-tab" data-lang="cyber">CyberScript</button>
+          <button class="help-tab" data-lang="vectra">Vectra</button>
+          <button class="help-tab" data-lang="shadow">ShadowScript</button>
+          <button class="help-tab" data-lang="cyberhack">CyberHack</button>
+          <button class="help-tab" data-lang="ctrlworld">CtrlWorld</button>
+        </div>
+        <div class="help-body" id="helpBody"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
