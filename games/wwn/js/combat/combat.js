@@ -2,205 +2,24 @@
   "use strict";
   function CombatSystem() {
     var C = global.WWNConfig;
-    this.projectiles = new global.WWNPool(function () {
-      return { alive:false,type:"",x:0,y:0,vx:0,vy:0,angle:0,life:0,maxLife:1,dmg:0,ownerId:"",team:"NONE",radius:3,aoe:0,color:"#fff",targetId:null,turn:0,split:0,emp:false,secret:false };
-    }, function (p) { p.alive = false; p.targetId = null; }, C.MAX_PROJECTILES);
-    this.mines = new global.WWNPool(function () {
-      return { alive:false,x:0,y:0,ownerId:"",team:"NONE",arm:0,dmg:0,aoe:70,radius:12,color:"#ff6b6b" };
-    }, function (m) { m.alive = false; }, C.MAX_MINES);
-    this.decoys = new global.WWNPool(function () {
-      return { alive:false,x:0,y:0,vx:0,vy:0,angle:0,life:0,ownerId:"",team:"NONE",radius:16 };
-    }, function (d) { d.alive = false; }, C.MAX_DECOYS);
-    this.particles = new global.WWNPool(function () {
-      return { alive:false,x:0,y:0,vx:0,vy:0,life:0,maxLife:1,r:2,color:"#fff" };
-    }, function (p) { p.alive = false; }, C.MAX_PARTICLES);
-    this.effects = [];
-    this.events = [];
+    this.projectiles = new global.WWNPool(function () { return { alive:false,type:"",x:0,y:0,vx:0,vy:0,angle:0,life:0,maxLife:1,dmg:0,ownerId:"",team:"NONE",radius:3,aoe:0,color:"#fff",targetId:null,turn:0,split:0,emp:false,secret:false }; }, function (p) { p.alive=false; p.targetId=null; }, C.MAX_PROJECTILES);
+    this.mines = new global.WWNPool(function () { return { alive:false,x:0,y:0,ownerId:"",team:"NONE",arm:0,dmg:0,aoe:70,radius:12,color:"#ff6b6b",life:22 }; }, function (m) { m.alive=false; }, C.MAX_MINES);
+    this.decoys = new global.WWNPool(function () { return { alive:false,x:0,y:0,vx:0,vy:0,angle:0,life:0,ownerId:"",team:"NONE",radius:16 }; }, function (d) { d.alive=false; }, C.MAX_DECOYS);
+    this.particles = new global.WWNPool(function () { return { alive:false,x:0,y:0,vx:0,vy:0,life:0,maxLife:1,r:2,color:"#fff" }; }, function (p) { p.alive=false; }, C.MAX_PARTICLES);
+    this.effects=[]; this.events=[];
   }
-  CombatSystem.prototype.reset = function () {
-    this.projectiles.clear(); this.mines.clear(); this.decoys.clear(); this.particles.clear();
-    this.effects = []; this.events = [];
-  };
-  CombatSystem.prototype.spawnParticle = function (x, y, color, n, speed) {
-    n = n || 6; speed = speed || 80;
-    for (var i = 0; i < n; i++) {
-      if (this.particles.live.length >= global.WWNConfig.MAX_PARTICLES) break;
-      var p = this.particles.acquire();
-      var a = Math.random() * Math.PI * 2, s = speed * (0.4 + Math.random() * 0.8);
-      p.alive = true; p.x = x; p.y = y; p.vx = Math.cos(a) * s; p.vy = Math.sin(a) * s;
-      p.life = 0.25 + Math.random() * 0.45; p.maxLife = p.life; p.r = 1.5 + Math.random() * 3; p.color = color || "#fff";
-    }
-  };
-  CombatSystem.prototype.fireMain = function (player, loadout, now) {
-    if (loadout.overheated || loadout.isEmped(now)) return null;
-    var id = loadout.mainId(), w = global.WWNWeapons[id];
-    if (!w || this.projectiles.live.length >= global.WWNConfig.MAX_PROJECTILES) return null;
-    if (id === "vulcan") {
-      if (loadout.heat >= w.overheat) { loadout.overheated = true; return null; }
-      loadout.heat = Math.min(w.overheat, loadout.heat + w.heat);
-      return this._spawnBullet(player, w, id);
-    }
-    if (id === "laser") {
-      if (loadout.energy < w.energy) return null;
-      loadout.energy -= w.energy;
-      return this._spawnLaser(player, w);
-    }
-    if (id === "plasma") {
-      if (loadout.energy < w.energy) return null;
-      loadout.energy -= w.energy;
-      return this._spawnBullet(player, w, id);
-    }
-    return null;
-  };
-  CombatSystem.prototype.fireSub = function (player, loadout, now, remotes) {
-    if (loadout.isEmped(now)) return null;
-    var id = loadout.subId(), w = global.WWNWeapons[id];
-    if (!w || loadout.cd[id] > 0) return null;
-    if (w.ammoMax != null && (loadout.ammo[id] || 0) <= 0) return null;
-    if (id === "missile") {
-      var target = this._findLockTarget(player, w.lockRange, remotes);
-      if (!target) return null;
-      loadout.ammo[id]--; loadout.cd[id] = 1 / w.rate;
-      return this._spawnMissile(player, w, target.netId || target.id);
-    }
-    if (id === "cluster") {
-      loadout.ammo[id]--; loadout.cd[id] = 1 / w.rate;
-      return this._spawnBullet(player, w, id);
-    }
-    if (id === "emp") {
-      loadout.ammo[id]--; loadout.cd[id] = 1 / w.rate;
-      return this._spawnEmp(player, w);
-    }
-    return null;
-  };
-  CombatSystem.prototype.useGadget = function (player, loadout, now) {
-    if (loadout.isEmped(now)) return null;
-    var id = loadout.gadgetId(), w = global.WWNWeapons[id];
-    if (!w || loadout.cd[id] > 0) return null;
-    if (id === "mine") {
-      if ((loadout.ammo[id] || 0) <= 0) return null;
-      loadout.ammo[id]--; loadout.cd[id] = 1 / w.rate;
-      return this._spawnMine(player, w);
-    }
-    if (id === "stealth") {
-      loadout.cd[id] = w.cooldown; loadout.stealthUntil = now + w.duration;
-      this.events.push({ t: "stealth", id: player.netId, until: loadout.stealthUntil });
-      return { type: "stealth" };
-    }
-    if (id === "chaff") {
-      if ((loadout.ammo[id] || 0) <= 0) return null;
-      loadout.ammo[id]--; loadout.cd[id] = w.cooldown; loadout.chaffUntil = now + w.duration;
-      this.spawnParticle(player.x, player.y, "#eee", 20, 120);
-      this.events.push({ t: "chaff", id: player.netId, until: loadout.chaffUntil });
-      return { type: "chaff" };
-    }
-    if (id === "decoy") {
-      if ((loadout.ammo[id] || 0) <= 0) return null;
-      loadout.ammo[id]--; loadout.cd[id] = w.cooldown;
-      return this._spawnDecoy(player, w);
-    }
-    return null;
-  };
-  CombatSystem.prototype._spawnBullet = function (player, w, type) {
-    var p = this.projectiles.acquire();
-    p.alive = true; p.type = type;
-    p.x = player.x + Math.cos(player.angle) * 20; p.y = player.y + Math.sin(player.angle) * 20;
-    p.angle = player.angle;
-    p.vx = Math.cos(player.angle) * w.speed + player.vx * 0.3;
-    p.vy = Math.sin(player.angle) * w.speed + player.vy * 0.3;
-    p.life = w.life; p.maxLife = w.life; p.dmg = w.dmg;
-    p.ownerId = player.netId || "local"; p.team = player.team || "NONE";
-    p.radius = w.radius || 4; p.aoe = w.aoe || 0; p.color = w.color;
-    p.targetId = null; p.turn = 0; p.split = type === "cluster" ? (w.splits || 6) : 0; p.emp = false; p.secret = false;
-    this.events.push({ t:"proj", type:type, x:p.x, y:p.y, vx:p.vx, vy:p.vy, angle:p.angle, life:p.life, dmg:p.dmg, ownerId:p.ownerId, team:p.team, radius:p.radius, aoe:p.aoe, color:p.color, split:p.split });
-    return p;
-  };
-  CombatSystem.prototype._spawnLaser = function (player, w) {
-    var beam = { type:"laser", x:player.x, y:player.y, angle:player.angle, range:w.range, dmg:w.dmg, ownerId:player.netId||"local", team:player.team||"NONE", color:w.color, width:w.width||3, life:0.08 };
-    this.effects.push(beam);
-    this.events.push({ t:"laser", x:beam.x, y:beam.y, angle:beam.angle, range:beam.range, dmg:beam.dmg, ownerId:beam.ownerId, team:beam.team, color:beam.color });
-    return beam;
-  };
-  CombatSystem.prototype._spawnMissile = function (player, w, targetId) {
-    var p = this.projectiles.acquire();
-    p.alive = true; p.type = "missile";
-    p.x = player.x + Math.cos(player.angle) * 22; p.y = player.y + Math.sin(player.angle) * 22;
-    p.angle = player.angle; p.vx = Math.cos(player.angle) * w.speed; p.vy = Math.sin(player.angle) * w.speed;
-    p.life = w.life; p.maxLife = w.life; p.dmg = w.dmg; p.ownerId = player.netId || "local"; p.team = player.team || "NONE";
-    p.radius = w.radius; p.aoe = 40; p.color = w.color; p.targetId = targetId; p.turn = w.turn; p.split = 0; p.emp = false; p.secret = false;
-    this.events.push({ t:"proj", type:"missile", x:p.x, y:p.y, vx:p.vx, vy:p.vy, angle:p.angle, life:p.life, dmg:p.dmg, ownerId:p.ownerId, team:p.team, radius:p.radius, aoe:p.aoe, color:p.color, targetId:targetId, turn:p.turn });
-    return p;
-  };
-  CombatSystem.prototype._spawnEmp = function (player, w) {
-    this.spawnParticle(player.x, player.y, w.color, 28, 200);
-    this.effects.push({ type:"empRing", x:player.x, y:player.y, r:0, maxR:w.aoe, life:0.5, color:w.color });
-    this.events.push({ t:"emp", x:player.x, y:player.y, aoe:w.aoe, duration:w.duration, dmg:w.dmg, ownerId:player.netId||"local", team:player.team||"NONE" });
-    return { type:"emp", aoe:w.aoe, duration:w.duration, dmg:w.dmg };
-  };
-  CombatSystem.prototype._spawnMine = function (player, w) {
-    var m = this.mines.acquire();
-    m.alive = true; m.x = player.x - Math.cos(player.angle) * 30; m.y = player.y - Math.sin(player.angle) * 30;
-    m.ownerId = player.netId || "local"; m.team = player.team || "NONE"; m.arm = w.armTime; m.dmg = w.dmg; m.aoe = w.aoe; m.radius = w.radius; m.color = w.color;
-    this.events.push({ t:"mine", x:m.x, y:m.y, ownerId:m.ownerId, team:m.team, arm:m.arm, dmg:m.dmg, aoe:m.aoe, radius:m.radius, color:m.color });
-    return m;
-  };
-  CombatSystem.prototype._spawnDecoy = function (player, w) {
-    var d = this.decoys.acquire();
-    d.alive = true; d.x = player.x; d.y = player.y; d.angle = player.angle + (Math.random() - 0.5);
-    d.vx = Math.cos(d.angle) * w.speed; d.vy = Math.sin(d.angle) * w.speed;
-    d.life = w.duration; d.ownerId = player.netId || "local"; d.team = player.team || "NONE"; d.radius = w.radius;
-    this.events.push({ t:"decoy", x:d.x, y:d.y, vx:d.vx, vy:d.vy, angle:d.angle, life:d.life, ownerId:d.ownerId, team:d.team, radius:d.radius });
-    return d;
-  };
-  CombatSystem.prototype.spawnOrbital = function (player) {
-    var beam = { type:"orbital", x:player.x, y:player.y, angle:player.angle, life:1.8, dmg:120, ownerId:player.netId||"local", team:player.team||"NONE", width:28, range:2000 };
-    this.effects.push(beam);
-    this.events.push({ t:"orbital", x:beam.x, y:beam.y, angle:beam.angle, life:beam.life, dmg:beam.dmg, ownerId:beam.ownerId, team:beam.team });
-    this.spawnParticle(player.x, player.y, "#00f5ff", 40, 250);
-  };
-  CombatSystem.prototype._findLockTarget = function (player, range, remotes) {
-    var best = null, bestD = range, list = remotes || [];
-    for (var i = 0; i < list.length; i++) {
-      var r = list[i];
-      if (!r.alive || r.hp <= 0 || r.stealthed) continue;
-      if (player.team && player.team !== "NONE" && r.team === player.team) continue;
-      var d = Math.hypot(r.x - player.x, r.y - player.y);
-      if (d < bestD) { bestD = d; best = r; }
-    }
-    return best;
-  };
-  CombatSystem.prototype.ingestRemoteEvent = function (ev) {
-    if (!ev || !ev.t) return;
-    if (ev.t === "proj") {
-      if (this.projectiles.live.length >= global.WWNConfig.MAX_PROJECTILES) return;
-      var p = this.projectiles.acquire();
-      p.alive = true; p.type = ev.type; p.x = ev.x; p.y = ev.y; p.vx = ev.vx; p.vy = ev.vy;
-      p.angle = ev.angle; p.life = ev.life; p.maxLife = ev.life; p.dmg = ev.dmg; p.ownerId = ev.ownerId;
-      p.team = ev.team || "NONE"; p.radius = ev.radius || 4; p.aoe = ev.aoe || 0; p.color = ev.color || "#fff";
-      p.targetId = ev.targetId || null; p.turn = ev.turn || 0; p.split = ev.split || 0; p.emp = !!ev.emp; p.secret = false;
-    } else if (ev.t === "laser") {
-      this.effects.push({ type:"laser", x:ev.x, y:ev.y, angle:ev.angle, range:ev.range, dmg:ev.dmg, ownerId:ev.ownerId, team:ev.team, color:ev.color, width:3, life:0.08 });
-    } else if (ev.t === "emp") {
-      this.effects.push({ type:"empRing", x:ev.x, y:ev.y, r:0, maxR:ev.aoe, life:0.5, color:"#7df9ff" });
-      this.spawnParticle(ev.x, ev.y, "#7df9ff", 20, 180);
-    } else if (ev.t === "mine") {
-      if (this.mines.live.length >= global.WWNConfig.MAX_MINES) return;
-      var m = this.mines.acquire();
-      m.alive = true; m.x = ev.x; m.y = ev.y; m.ownerId = ev.ownerId; m.team = ev.team; m.arm = ev.arm || 0.8;
-      m.dmg = ev.dmg; m.aoe = ev.aoe; m.radius = ev.radius; m.color = ev.color;
-    } else if (ev.t === "decoy") {
-      if (this.decoys.live.length >= global.WWNConfig.MAX_DECOYS) return;
-      var d = this.decoys.acquire();
-      d.alive = true; d.x = ev.x; d.y = ev.y; d.vx = ev.vx; d.vy = ev.vy; d.angle = ev.angle;
-      d.life = ev.life; d.ownerId = ev.ownerId; d.team = ev.team; d.radius = ev.radius || 16;
-    } else if (ev.t === "orbital") {
-      this.effects.push({ type:"orbital", x:ev.x, y:ev.y, angle:ev.angle, life:ev.life, dmg:ev.dmg, ownerId:ev.ownerId, team:ev.team, width:28, range:2000 });
-    } else if (ev.t === "explode") {
-      this.spawnParticle(ev.x, ev.y, ev.color || "#ff2d95", ev.n || 16, ev.speed || 160);
-    }
-  };
-  CombatSystem.prototype.flushEvents = function () {
-    var e = this.events; this.events = []; return e;
-  };
-  global.WWNCombat = CombatSystem;
-})(typeof window !== "undefined" ? window : globalThis);
+  CombatSystem.prototype.reset=function(){this.projectiles.clear();this.mines.clear();this.decoys.clear();this.particles.clear();this.effects=[];this.events=[]};
+  CombatSystem.prototype.spawnParticle=function(x,y,color,n,speed){n=n||6;speed=speed||80;for(var i=0;i<n;i++){if(this.particles.live.length>=C.MAX_PARTICLES)break;var p=this.particles.acquire(),a=Math.random()*Math.PI*2,s=speed*(.4+Math.random()*.8);p.alive=true;p.x=x;p.y=y;p.vx=Math.cos(a)*s;p.vy=Math.sin(a)*s;p.life=.25+Math.random()*.45;p.maxLife=p.life;p.r=1.5+Math.random()*3;p.color=color||"#fff"}};
+  CombatSystem.prototype.fireMain=function(player,loadout,now){if(loadout.overheated||loadout.isEmped(now))return null;var id=loadout.mainId(),w=global.WWNWeapons[id];if(!w)return null;if(id=== "vulcan"){if(loadout.heat>=w.overheat){loadout.overheated=true;return null}loadout.heat=Math.min(w.overheat,loadout.heat+w.heat);return this._spawnBullet(player,w,id)}if(id=== "laser"){if(loadout.energy<w.energy)return null;loadout.energy-=w.energy;return this._spawnLaser(player,w)}if(id=== "plasma"){if(loadout.energy<w.energy)return null;loadout.energy-=w.energy;return this._spawnBullet(player,w,id)}return null};
+  CombatSystem.prototype.fireSub=function(player,loadout,now,targets){if(loadout.isEmped(now))return null;var id=loadout.subId(),w=global.WWNWeapons[id];if(!w||loadout.cd[id]>0||(w.ammoMax!=null&&(loadout.ammo[id]||0)<=0))return null;if(id=== "missile"){var target=this._findLockTarget(player,w.lockRange,targets);if(!target)return null;loadout.ammo[id]--;loadout.cd[id]=1/(w.rate||1);return this._spawnMissile(player,w,target.netId||target.id)}loadout.ammo[id]--;loadout.cd[id]=1/(w.rate||1);return id=== "cluster"?this._spawnBullet(player,w,id):this._spawnEmp(player,w)};
+  CombatSystem.prototype.useGadget=function(player,loadout,now){if(loadout.isEmped(now))return null;var id=loadout.gadgetId(),w=global.WWNWeapons[id];if(!w||loadout.cd[id]>0)return null;if(id=== "mine"){if((loadout.ammo[id]||0)<=0)return null;loadout.ammo[id]--;loadout.cd[id]=1/(w.rate||1);return this._spawnMine(player,w)}if(id=== "stealth"){loadout.cd[id]=w.cooldown;loadout.stealthUntil=now+w.duration;this.events.push({t:"stealth",id:player.netId,until:loadout.stealthUntil});return {type:"stealth"}}if(id=== "chaff"){if((loadout.ammo[id]||0)<=0)return null;loadout.ammo[id]--;loadout.cd[id]=w.cooldown;loadout.chaffUntil=now+w.duration;this.events.push({t:"chaff",id:player.netId,until:loadout.chaffUntil});return {type:"chaff"}}if(id=== "decoy"){if((loadout.ammo[id]||0)<=0)return null;loadout.ammo[id]--;loadout.cd[id]=w.cooldown||.5;return this._spawnDecoy(player,w)}return null};
+  CombatSystem.prototype._spawnBullet=function(player,w,type){var p=this.projectiles.acquire();p.alive=true;p.type=type;p.x=player.x+Math.cos(player.angle)*22;p.y=player.y+Math.sin(player.angle)*22;p.angle=player.angle;p.vx=Math.cos(player.angle)*w.speed+player.vx*.3;p.vy=Math.sin(player.angle)*w.speed+player.vy*.3;p.life=w.life;p.maxLife=w.life;p.dmg=w.dmg;p.ownerId=player.netId||"local";p.team=player.team||"NONE";p.radius=w.radius||4;p.aoe=w.aoe||0;p.color=w.color;p.targetId=null;p.turn=0;p.split=type=== "cluster"?(w.splits||w.split||6):0;p.emp=false;p.secret=false;this.events.push({t:"proj",type:type,x:p.x,y:p.y,vx:p.vx,vy:p.vy,angle:p.angle,life:p.life,dmg:p.dmg,ownerId:p.ownerId,team:p.team,radius:p.radius,aoe:p.aoe,color:p.color,split:p.split,targetId:null,turn:0,emp:false});return p};
+  CombatSystem.prototype._spawnLaser=function(player,w){var beam={type:"laser",x:player.x,y:player.y,angle:player.angle,range:w.range,dmg:w.dmg,ownerId:player.netId||"local",team:player.team||"NONE",color:w.color,width:w.width||3,life:.12};this.effects.push(beam);this.events.push({t:"laser",x:beam.x,y:beam.y,angle:beam.angle,range:beam.range,dmg:beam.dmg,ownerId:beam.ownerId,team:beam.team,color:beam.color,width:beam.width});return beam};
+  CombatSystem.prototype._spawnMissile=function(player,w,targetId){var p=this.projectiles.acquire();p.alive=true;p.type="missile";p.x=player.x+Math.cos(player.angle)*24;p.y=player.y+Math.sin(player.angle)*24;p.angle=player.angle;p.vx=Math.cos(player.angle)*w.speed;p.vy=Math.sin(player.angle)*w.speed;p.life=w.life;p.maxLife=w.life;p.dmg=w.dmg;p.ownerId=player.netId||"local";p.team=player.team||"NONE";p.radius=w.radius;p.aoe=40;p.color=w.color;p.targetId=targetId;p.turn=w.turn;p.split=0;p.emp=false;p.secret=false;this.events.push({t:"proj",type:"missile",x:p.x,y:p.y,vx:p.vx,vy:p.vy,angle:p.angle,life:p.life,dmg:p.dmg,ownerId:p.ownerId,team:p.team,radius:p.radius,aoe:p.aoe,color:p.color,targetId:targetId,turn:p.turn,split:0,emp:false});return p};
+  CombatSystem.prototype._spawnEmp=function(player,w){this.spawnParticle(player.x,player.y,w.color,28,200);this.effects.push({type:"empRing",x:player.x,y:player.y,r:0,maxR:w.aoe,life:.5,color:w.color});this.events.push({t:"emp",x:player.x,y:player.y,aoe:w.aoe,duration:w.duration,dmg:w.dmg,ownerId:player.netId||"local",team:player.team||"NONE"});return {type:"emp",aoe:w.aoe,duration:w.duration,dmg:w.dmg}};
+  CombatSystem.prototype._spawnMine=function(player,w){var m=this.mines.acquire();m.alive=true;m.x=player.x-Math.cos(player.angle)*30;m.y=player.y-Math.sin(player.angle)*30;m.ownerId=player.netId||"local";m.team=player.team||"NONE";m.arm=w.armTime;m.dmg=w.dmg;m.aoe=w.aoe;m.radius=w.radius;m.life=w.life;m.color=w.color;this.events.push({t:"mine",x:m.x,y:m.y,ownerId:m.ownerId,team:m.team,arm:m.arm,dmg:m.dmg,aoe:m.aoe,radius:m.radius,color:m.color,life:m.life});return m};
+  CombatSystem.prototype._spawnDecoy=function(player,w){var d=this.decoys.acquire();d.alive=true;d.x=player.x;d.y=player.y;d.angle=player.angle+(Math.random()-.5);d.vx=Math.cos(d.angle)*w.speed;d.vy=Math.sin(d.angle)*w.speed;d.life=w.duration;d.ownerId=player.netId||"local";d.team=player.team||"NONE";d.radius=w.radius;this.events.push({t:"decoy",x:d.x,y:d.y,vx:d.vx,vy:d.vy,angle:d.angle,life:d.life,ownerId:d.ownerId,team:d.team,radius:d.radius});return d};
+  CombatSystem.prototype._findLockTarget=function(player,range,targets){var best=null,bestD=range||(700);(targets||[]).forEach(function(t){if(!t||t===player||t.alive===false||t.hp<=0||t.stealthed||t.isAlly)return;if(player.team&&player.team!=="NONE"&&t.team===player.team)return;var d=Math.hypot(t.x-player.x,t.y-player.y);if(d<bestD){best=t;bestD=d}});return best};
+  CombatSystem.prototype.ingestRemoteEvent=function(ev){if(!ev||!ev.t)return;if(ev.t=== "proj"){if(this.projectiles.live.length>=global.WWNConfig.MAX_PROJECTILES)return;var p=this.projectiles.acquire();p.alive=true;p.type=ev.type;p.x=ev.x;p.y=ev.y;p.vx=ev.vx;p.vy=ev.vy;p.angle=ev.angle;p.life=ev.life;p.maxLife=ev.life;p.dmg=ev.dmg;p.ownerId=ev.ownerId;p.team=ev.team||"NONE";p.radius=ev.radius||4;p.aoe=ev.aoe||0;p.color=ev.color||"#fff";p.targetId=ev.targetId||null;p.turn=ev.turn||0;p.split=ev.split||0;p.emp=!!ev.emp}else if(ev.t=== "laser")this.effects.push({type:"laser",x:ev.x,y:ev.y,angle:ev.angle,range:ev.range,dmg:ev.dmg,ownerId:ev.ownerId,team:ev.team,color:ev.color,width:ev.width||3,life:.12});else if(ev.t=== "emp")this.effects.push({type:"empRing",x:ev.x,y:ev.y,r:0,maxR:ev.aoe,life:.5,color:"#9b5de5"});else if(ev.t=== "mine"){var m=this.mines.acquire();m.alive=true;m.x=ev.x;m.y=ev.y;m.ownerId=ev.ownerId;m.team=ev.team;m.arm=ev.arm||.8;m.dmg=ev.dmg;m.aoe=ev.aoe;m.radius=ev.radius;m.life=ev.life||22;m.color=ev.color}else if(ev.t=== "decoy"){var d=this.decoys.acquire();d.alive=true;d.x=ev.x;d.y=ev.y;d.vx=ev.vx;d.vy=ev.vy;d.angle=ev.angle;d.life=ev.life;d.ownerId=ev.ownerId;d.team=ev.team;d.radius=ev.radius||16}};
+  CombatSystem.prototype.flushEvents=function(){var e=this.events;this.events=[];return e};global.WWNCombat=CombatSystem;
+})(typeof window!=="undefined"?window:globalThis);

@@ -1,44 +1,29 @@
 (function (global) {
   "use strict";
   function drawMinimap(canvas, player, bots, remotes, world, combat, localTeam) {
-    if (!canvas || !player || !global.WWNConfig) return;
-    var ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    var w = canvas.width, h = canvas.height, half = global.WWNConfig.WORLD_SIZE / 2;
-    var sx = w / global.WWNConfig.WORLD_SIZE, sy = h / global.WWNConfig.WORLD_SIZE;
-    function px(x) { return Math.max(0, Math.min(w, (x + half) * sx)); }
-    function py(y) { return Math.max(0, Math.min(h, (y + half) * sy)); }
+    if (!canvas || !player) return;
+    var ctx = canvas.getContext("2d"); if (!ctx) return;
+    var w = canvas.width || 120, h = canvas.height || 120, C = global.WWNConfig;
+    if (!C) return; var half = C.WORLD_SIZE / 2;
+    var sx = w / C.WORLD_SIZE, sy = h / C.WORLD_SIZE;
+    var px = function (x) { return Math.max(0, Math.min(w, (x + half) * sx)); };
+    var py = function (y) { return Math.max(0, Math.min(h, (y + half) * sy)); };
     ctx.clearRect(0, 0, w, h);
-    var bg = ctx.createLinearGradient(0, 0, w, h);
-    bg.addColorStop(0, "#101832"); bg.addColorStop(1, "#07101e");
-    ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
-    ctx.strokeStyle = "rgba(95,160,210,.17)"; ctx.lineWidth = 1;
-    for (var i = 1; i < 4; i++) {
-      ctx.beginPath(); ctx.moveTo(w * i / 4, 0); ctx.lineTo(w * i / 4, h); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0, h * i / 4); ctx.lineTo(w, h * i / 4); ctx.stroke();
-    }
-    ctx.strokeStyle = "rgba(255,75,120,.72)"; ctx.strokeRect(.5, .5, w - 1, h - 1);
+    var grd = ctx.createRadialGradient(w * .5, h * .5, 4, w * .5, h * .5, w * .72);
+    grd.addColorStop(0, "#18264a"); grd.addColorStop(1, "#070a16"); ctx.fillStyle = grd; ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = "rgba(0,245,255,.16)"; ctx.lineWidth = 1;
+    for (var g = 1; g < 6; g++) { ctx.beginPath(); ctx.moveTo(w * g / 6, 0); ctx.lineTo(w * g / 6, h); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, h * g / 6); ctx.lineTo(w, h * g / 6); ctx.stroke(); }
+    ctx.strokeStyle = "rgba(255,80,130,.9)"; ctx.strokeRect(.5, .5, w - 1, h - 1);
     if (combat) {
-      if (combat.mines && combat.mines.forEach) combat.mines.forEach(function (m) {
-        if (!m.alive) return;
-        ctx.fillStyle = m.team === localTeam ? "#ff866b" : "#ff4f76";
-        ctx.fillRect(px(m.x) - 1.5, py(m.y) - 1.5, 3, 3);
-      });
-      if (combat.decoys && combat.decoys.forEach) combat.decoys.forEach(function (d) {
-        if (!d.alive) return;
-        ctx.fillStyle = "#ffbf68"; ctx.beginPath(); ctx.arc(px(d.x), py(d.y), 2, 0, Math.PI * 2); ctx.fill();
-      });
+      combat.mines && combat.mines.forEach(function (m) { if (m.alive) { ctx.fillStyle = "#ff5577"; ctx.beginPath(); ctx.arc(px(m.x), py(m.y), 1.8, 0, Math.PI * 2); ctx.fill(); } });
+      combat.decoys && combat.decoys.forEach(function (d) { if (d.alive) { ctx.fillStyle = "#ffbd66"; ctx.beginPath(); ctx.arc(px(d.x), py(d.y), 2, 0, Math.PI * 2); ctx.fill(); } });
     }
     (bots || []).concat(remotes || []).forEach(function (r) {
       if (!r || r.alive === false || r.hp <= 0 || r.stealthed) return;
-      var ally = r.isAlly || (localTeam && localTeam !== "NONE" && r.team === localTeam);
-      ctx.fillStyle = ally ? "#48e5ff" : "#ff4d91";
-      ctx.beginPath(); ctx.arc(px(r.x), py(r.y), r.isAlly ? 2.5 : 2, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = r.isAlly || (localTeam && localTeam !== "NONE" && r.team === localTeam) ? "#48e9ff" : "#ff4d91";
+      ctx.beginPath(); ctx.arc(px(r.x), py(r.y), r.isAlly ? 3 : 2.2, 0, Math.PI * 2); ctx.fill();
     });
-    var x = px(player.x), y = py(player.y);
-    ctx.fillStyle = "#ffe15a"; ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = "#ffe15a"; ctx.lineWidth = 1.5; ctx.beginPath();
-    ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(player.angle) * 9, y + Math.sin(player.angle) * 9); ctx.stroke();
+    var x = px(player.x), y = py(player.y); ctx.fillStyle = "#ffe369"; ctx.beginPath(); ctx.arc(x, y, 3.8, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = "#fff4a8"; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(player.angle) * 10, y + Math.sin(player.angle) * 10); ctx.stroke();
   }
   global.WWNMinimap = { draw: drawMinimap };
 })(typeof window !== "undefined" ? window : globalThis);
