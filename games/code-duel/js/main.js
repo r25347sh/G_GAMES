@@ -1,5 +1,5 @@
 /**
- * CODE DUEL — Entry (lobby + game)
+ * CODE DUEL — Entry (lobby + game + tutorial)
  */
 import { Game } from './game.js';
 import { Network } from './network.js';
@@ -19,9 +19,11 @@ class App {
     this.fps = 0;
     this.frameCount = 0;
     this.fpsTime = 0;
-    this.mode = 'lobby';
+    this.mode = 'lobby'; // lobby | cpu | online | tutorial
     this.secretUnlocked = false;
     this.cpuLevel = 3;
+    this.selectedLang = 'novice'; // chosen only in lobby
+    this.tutorialLang = null;
     this._secretBuf = '';
   }
 
@@ -37,6 +39,7 @@ class App {
     this.game.init();
     this.network.init();
 
+    // Secret: type "overkill" anywhere in lobby
     window.addEventListener('keydown', (e) => {
       if (this.mode !== 'lobby') return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -62,28 +65,81 @@ class App {
     this.secretUnlocked = true;
     try { localStorage.setItem('cd_secret', '1'); } catch (_) {}
     this.ui.onSecretUnlocked();
-    if (!silent) this.ui.showToast('SECRET UNLOCKED: CtrlWorld', false, true);
+    if (!silent) {
+      this.ui.showToast('SECRET UNLOCKED: CtrlWorld', false, true);
+    }
     const cw = this.langManager.interpreters.ctrlworld;
     if (cw && cw.unlock) cw.unlock();
+  }
+
+  /** Language can only be chosen in lobby */
+  setSelectedLang(lang) {
+    if (this.mode !== 'lobby') return;
+    this.selectedLang = lang || 'novice';
+    this.langManager.setLanguage(this.selectedLang);
   }
 
   startCpu(level) {
     this.mode = 'cpu';
     this.cpuLevel = level;
     this.cpu.start(level);
+
+    // Language locked to lobby selection
+    this.langManager.setLanguage(this.selectedLang);
+    this.ui.lockLanguage(this.selectedLang);
+
+    // EMPTY start — no sample code
+    this.ui.setSelfCode('');
+    this.ui.setEnemyCode('');
+    this.ui.clearConsoles();
+
     this.ui.showGameLayer('CPU Lv' + level + ' (' + this.cpu.getWpm(level) + ' WPM)');
     this.ui.setCpuWpmLabel(this.cpu.getWpm(level) + ' WPM · Lv' + level);
-    this.langManager.setLanguage('novice');
-    const sample = this.langManager.getSample('novice');
-    if (sample) this.ui.setSelfCode(sample);
     this.game.startMatch();
   }
 
   startOnline() {
     this.mode = 'online';
     this.cpu.stop();
+    this.langManager.setLanguage(this.selectedLang);
+    this.ui.lockLanguage(this.selectedLang);
+    this.ui.setSelfCode('');
+    this.ui.setEnemyCode('');
+    this.ui.clearConsoles();
     this.ui.showGameLayer('ONLINE');
     this.ui.setCpuWpmLabel('');
+    this.game.startMatch();
+  }
+
+  /** Per-language tutorial mode */
+  startTutorial(lang) {
+    this.mode = 'tutorial';
+    this.tutorialLang = lang || this.selectedLang;
+    this.cpu.stop();
+    this.langManager.setLanguage(this.tutorialLang);
+    this.ui.lockLanguage(this.tutorialLang);
+
+    // Load tutorial starter code (guided, not full sample)
+    const starter = this.langManager.getTutorialStarter(this.tutorialLang);
+    this.ui.setSelfCode(starter || '');
+    this.ui.setEnemyCode('');
+    this.ui.clearConsoles();
+
+    // Very weak dummy CPU for tutorial
+    this.cpu.setLevel(1);
+    this.cpu.start(1);
+    // Override to almost passive
+    this.cpu.cfg = {
+      wpm: 30,
+      label: 'Tutorial Dummy',
+      interval: 8,
+      aggression: 0.15,
+      analyzeDepth: 0,
+    };
+
+    this.ui.showGameLayer('TUTORIAL · ' + (this.tutorialLang || '').toUpperCase());
+    this.ui.setCpuWpmLabel('TUTORIAL MODE');
+    this.ui.logSelf('Tutorial started for ' + this.tutorialLang + '. Follow the comments in the editor.');
     this.game.startMatch();
   }
 
@@ -92,6 +148,7 @@ class App {
     this.cpu.stop();
     this.game.state = 'idle';
     this.game.running = false;
+    this.ui.unlockLanguage();
     this.ui.showLobby();
   }
 
@@ -101,8 +158,8 @@ class App {
       const dt = Math.min((timestamp - this.lastTime) / 1000, 0.05);
       this.lastTime = timestamp;
 
-      if (this.mode === 'cpu' || this.mode === 'online') {
-        if (this.mode === 'cpu') this.cpu.update(dt);
+      if (this.mode === 'cpu' || this.mode === 'online' || this.mode === 'tutorial') {
+        if (this.mode === 'cpu' || this.mode === 'tutorial') this.cpu.update(dt);
         this.game.update(dt);
         this.game.render();
 
