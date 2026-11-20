@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CODE DUEL - Documentation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0a0e17; --panel: #0f1623; --border: #1e2a3a; --cyan: #00f0ff;
+      --text: #e8f0ff; --muted: #8b9bb4;
+      --mono: "JetBrains Mono", monospace; --display: "Orbitron", sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: var(--mono); font-size: 14px; line-height: 1.65; min-height: 100vh; display: flex; }
+    nav { width: 240px; background: var(--panel); border-right: 1px solid var(--border); padding: 20px 0; flex-shrink: 0; overflow-y: auto; height: 100vh; position: sticky; top: 0; }
+    nav h1 { font-family: var(--display); font-size: 0.85rem; letter-spacing: 0.15em; color: var(--cyan); padding: 0 18px 16px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+    nav a { display: block; padding: 8px 18px; color: var(--muted); text-decoration: none; font-size: 0.8rem; transition: all 0.15s; }
+    nav a:hover, nav a.active { color: var(--cyan); background: rgba(0, 240, 255, 0.06); }
+    main { flex: 1; padding: 32px 40px; max-width: 820px; overflow-y: auto; height: 100vh; }
+    #content h1, #content h2, #content h3 { font-family: var(--display); color: var(--cyan); margin: 1.4em 0 0.6em; letter-spacing: 0.06em; }
+    #content h1 { font-size: 1.5rem; margin-top: 0; }
+    #content h2 { font-size: 1.15rem; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+    #content h3 { font-size: 1rem; }
+    #content p, #content li { color: var(--muted); margin-bottom: 0.7em; }
+    #content ul, #content ol { padding-left: 1.4em; margin-bottom: 1em; }
+    #content code { background: #0a1018; padding: 1px 6px; border-radius: 3px; color: #ffd60a; font-size: 0.85em; }
+    #content pre { background: #080c14; border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; overflow-x: auto; margin: 12px 0 18px; font-size: 0.82rem; line-height: 1.5; color: var(--text); }
+    #content pre code { background: none; padding: 0; color: inherit; }
+    #content table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 0.85rem; }
+    #content th, #content td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; }
+    #content th { background: rgba(0, 240, 255, 0.08); color: var(--cyan); }
+    #content hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+    #content a { color: var(--cyan); }
+    .back-link { display: inline-block; margin-bottom: 20px; color: var(--muted); text-decoration: none; font-size: 0.8rem; }
+    .back-link:hover { color: var(--cyan); }
+    .loading { color: var(--muted); padding: 40px 0; }
+  </style>
+</head>
+<body>
+  <nav>
+    <h1>CODE DUEL DOCS</h1>
+    <a href="#" data-doc="README.md" class="active">ゲーム説明</a>
+    <a href="#" data-doc="controls.md">操作方法</a>
+    <a href="#" data-doc="novice.md">NoviceScript</a>
+    <a href="#" data-doc="cyber.md">CyberScript</a>
+    <a href="#" data-doc="vectra.md">Vectra</a>
+    <a href="#" data-doc="shadow.md">ShadowScript</a>
+    <a href="#" data-doc="cyberhack.md">CyberHack</a>
+    <a href="#" data-doc="ctrlworld.md">CtrlWorld</a>
+    <hr style="border-color:#1e2a3a;margin:16px 18px;" />
+    <a href="../index.html">← ゲームに戻る</a>
+  </nav>
+  <main>
+    <a class="back-link" href="../index.html">← CODE DUEL</a>
+    <div id="content" class="loading">Loading...</div>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script>
+    const content = document.getElementById('content');
+    const links = document.querySelectorAll('nav a[data-doc]');
+    async function loadDoc(name) {
+      content.className = 'loading';
+      content.textContent = 'Loading...';
+      try {
+        const res = await fetch(name);
+        if (!res.ok) throw new Error(res.status);
+        const md = await res.text();
+        content.className = '';
+        content.innerHTML = marked.parse(md);
+      } catch (e) {
+        content.className = '';
+        content.innerHTML = '<p>ドキュメントの読み込みに失敗しました。</p>';
+      }
+      links.forEach(a => a.classList.toggle('active', a.dataset.doc === name));
+    }
+    links.forEach(a => {
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        loadDoc(a.dataset.doc);
+        history.replaceState(null, '', '?' + a.dataset.doc);
+      });
+    });
+    const initial = location.search.slice(1) || 'README.md';
+    loadDoc(initial);
+  </script>
+</body>
+</html>
