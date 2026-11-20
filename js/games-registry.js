@@ -15,6 +15,16 @@
       highlight: true,
     },
     {
+      id: "code-duel",
+      title: "CODE DUEL",
+      description: "リアルタイム・プログラミング対戦。オリジナル言語で機体AIを記述し、相手のコードを読み合いながら戦うWebRTC P2Pバトル。",
+      path: "games/code-duel/index.html",
+      status: "ready",
+      statusLabel: "公開中（PLAYABLE）",
+      icon: "💻",
+      highlight: true,
+    },
+    {
       id: "coming-soon",
       title: "Coming Soon",
       description: "次のタイトルを鋭意制作中。乞うご期待。",

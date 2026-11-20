@@ -14,7 +14,8 @@ G_GAMES/
 ├── .github/workflows/deploy.yml
 ├── .gitignore / .gitattributes / .nojekyll
 └── games/
-    └── wwn/                # 第n次世界大戦
+    ├── wwn/                # 第n次世界大戦
+    └── code-duel/          # CODE DUEL（プログラミング対戦）
 ```
 
 ## ゲーム追加手順（競合ゼロ）
