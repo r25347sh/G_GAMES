@@ -1,238 +1,156 @@
 (function (global) {
   "use strict";
-
-  function friendly(aTeam, bTeam) {
-    if (!aTeam || !bTeam || aTeam === "NONE" || bTeam === "NONE") return false;
-    return aTeam === bTeam;
+  function friendly(a, b) {
+    if (!a || !b || a === "NONE" || b === "NONE") return false;
+    return a === b;
   }
-
-  function applyDamage(target, dmg, srcTeam, srcId) {
-    if (!target || target.hp <= 0) return false;
-    if (friendly(srcTeam, target.team)) return false;
-    target.hp = Math.max(0, target.hp - dmg);
-    target.lastHitBy = srcId;
-    return true;
-  }
-
   function explodeAt(combat, x, y, aoe, dmg, ownerId, team, targets) {
-    combat.spawnParticle(x, y, "#ff6b6b", 18, 150);
-    combat.events.push({ t: "explode", x: x, y: y, color: "#ff8c42", n: 16 });
-    for (var i = 0; i < targets.length; i++) {
-      var t = targets[i];
-      if (!t || t.hp <= 0) continue;
+    combat.spawnParticle(x, y, "#ff6b6b", 18, 140);
+    (targets || []).forEach(function (t) {
+      if (!t || !t.alive) return;
+      if (t.netId === ownerId) return;
+      if (friendly(team, t.team)) return;
       var d = Math.hypot(t.x - x, t.y - y);
       if (d <= aoe + (t.radius || 18)) {
         var falloff = 1 - (d / (aoe + 20)) * 0.5;
-        applyDamage(t, dmg * falloff, team, ownerId);
+        t.hp = Math.max(0, (t.hp || 0) - dmg * falloff);
+        t.lastHitBy = ownerId;
       }
-    }
+    });
   }
-
-  function findMissileTarget(p, targets, combat) {
+  function updateMissileTarget(p, combat, targets) {
     var locked = null;
     for (var i = 0; i < targets.length; i++) {
       var t = targets[i];
-      if (!t || t.hp <= 0) continue;
+      if (!t || !t.alive) continue;
       if (t.netId === p.targetId || t.id === p.targetId) { locked = t; break; }
     }
     if (locked && locked.chaffUntil && performance.now() / 1000 < locked.chaffUntil) {
-      if (Math.random() < 0.08) p.targetId = null;
+      if (Math.random() < 0.55) {
+        p.targetId = null; locked = null;
+        p.vx += (Math.random() - 0.5) * 220;
+        p.vy += (Math.random() - 0.5) * 220;
+      }
     }
     var bestDecoy = null, bestScore = 1e12;
     combat.decoys.forEach(function (d) {
-      if (!d.alive || d.hp <= 0) return;
+      if (!d.alive) return;
       if (friendly(d.team, p.team)) return;
-      if (d.ownerId === p.ownerId) return;
       var dd = Math.hypot(d.x - p.x, d.y - p.y);
-      if (dd > 900) return;
-      var score = dd * 0.55;
-      if (locked) {
-        var toLock = Math.hypot(locked.x - p.x, locked.y - p.y);
-        if (dd < toLock) score *= 0.5;
-      }
-      if (score < bestScore) { bestScore = score; bestDecoy = d; }
+      if (dd < bestScore) { bestScore = dd; bestDecoy = d; }
     });
-    if (bestDecoy) {
-      p.targetId = bestDecoy.id;
-      return bestDecoy;
+    if (bestDecoy && bestScore < 500) {
+      if (!locked || bestScore < Math.hypot(locked.x - p.x, locked.y - p.y) * 0.85) {
+        p.targetId = bestDecoy.id;
+        locked = bestDecoy;
+      }
     }
     return locked;
   }
-
+  function updateSpecialEffects(combat, dt, localPlayer, remotes) {
+    if (!combat || !combat.effects) return;
+    var targets = [localPlayer].concat(remotes || []).filter(function (t) { return t && t.alive; });
+    for (var i = combat.effects.length - 1; i >= 0; i--) {
+      var e = combat.effects[i];
+      if (!e) { combat.effects.splice(i, 1); continue; }
+      e.life = (e.life || 0) - dt;
+      if (e.type === "blackhole") {
+        e.r = Math.min(e.maxR || 160, (e.r || 0) + 80 * dt);
+        targets.forEach(function (t) {
+          if (!t || t.netId === e.ownerId) return;
+          if (e.team && t.team && e.team === t.team && t.team !== "NONE") return;
+          var dx = e.x - t.x, dy = e.y - t.y, d = Math.hypot(dx, dy) || 1;
+          if (d < e.r + 40) {
+            var pull = (e.pull || 400) * dt / Math.max(40, d);
+            t.vx = (t.vx || 0) + (dx / d) * pull;
+            t.vy = (t.vy || 0) + (dy / d) * pull;
+            if (e.dmg) t.hp = Math.max(0, (t.hp || 0) - e.dmg);
+          }
+        });
+      }
+      if (e.type === "orbitalBeam" || e.type === "laser") {
+        // visual only; damage applied on fire
+      }
+      if (e.life <= 0) combat.effects.splice(i, 1);
+    }
+  }
   function updateCombat(combat, dt, localPlayer, remotes, loadout, now) {
+    if (!combat) return;
     var targets = [localPlayer].concat(remotes || []);
-    var C = global.WWNConfig;
-
     combat.projectiles.forEach(function (p) {
       if (!p.alive) return;
+      p.life -= dt;
+      if (p.life <= 0) { p.alive = false; return; }
       if (p.type === "missile" && p.turn > 0) {
-        var tgt = findMissileTarget(p, targets, combat);
-        if (tgt && (tgt.hp > 0 || tgt.life > 0) && !tgt.stealthed) {
-          var desired = Math.atan2(tgt.y - p.y, tgt.x - p.x);
+        var locked = updateMissileTarget(p, combat, targets);
+        if (locked) {
+          var desired = Math.atan2(locked.y - p.y, locked.x - p.x);
           var diff = desired - p.angle;
           while (diff > Math.PI) diff -= Math.PI * 2;
           while (diff < -Math.PI) diff += Math.PI * 2;
           var maxT = p.turn * dt;
           if (Math.abs(diff) <= maxT) p.angle = desired;
           else p.angle += Math.sign(diff) * maxT;
-          var spd = Math.hypot(p.vx, p.vy) || 380;
-          p.vx = Math.cos(p.angle) * spd;
-          p.vy = Math.sin(p.angle) * spd;
+          var sp = Math.hypot(p.vx, p.vy) || 380;
+          p.vx = Math.cos(p.angle) * sp;
+          p.vy = Math.sin(p.angle) * sp;
         }
       }
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-      p.life -= dt;
-      if (p.life <= 0) {
-        if (p.split > 0) {
-          for (var s = 0; s < p.split; s++) {
-            if (combat.projectiles.live.length >= C.MAX_PROJECTILES) break;
-            var c = combat.projectiles.acquire();
-            var ang = p.angle + (s - p.split / 2) * 0.35;
-            c.alive = true; c.type = "shard"; c.x = p.x; c.y = p.y;
-            c.vx = Math.cos(ang) * 280; c.vy = Math.sin(ang) * 280;
-            c.angle = ang; c.life = 0.9; c.maxLife = 0.9; c.dmg = p.dmg * 0.6;
-            c.ownerId = p.ownerId; c.team = p.team; c.radius = 4; c.aoe = 40;
-            c.color = "#ff8c42"; c.targetId = null; c.turn = 0; c.split = 0;
-          }
-        }
-        if (p.aoe > 0) explodeAt(combat, p.x, p.y, p.aoe, p.dmg, p.ownerId, p.team, targets);
-        p.alive = false;
-        return;
-      }
-      for (var j = 0; j < targets.length; j++) {
-        var t = targets[j];
-        if (!t || t.hp <= 0) continue;
-        if (t.netId === p.ownerId || t.id === p.ownerId) continue;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      for (var ti = 0; ti < targets.length; ti++) {
+        var t = targets[ti];
+        if (!t || !t.alive) continue;
+        if (t.netId === p.ownerId) continue;
         if (friendly(p.team, t.team)) continue;
         var rad = (t.radius || 18) + p.radius;
         if (Math.hypot(t.x - p.x, t.y - p.y) <= rad) {
-          applyDamage(t, p.dmg, p.team, p.ownerId);
-          combat.spawnParticle(p.x, p.y, p.color, 8, 100);
+          t.hp = Math.max(0, (t.hp || 0) - p.dmg);
+          t.lastHitBy = p.ownerId;
           if (p.aoe > 0) explodeAt(combat, p.x, p.y, p.aoe, p.dmg * 0.5, p.ownerId, p.team, targets);
           p.alive = false;
+          combat.spawnParticle(p.x, p.y, p.color || "#fff", 10, 80);
           break;
         }
       }
-      if (!p.alive) return;
       combat.decoys.forEach(function (d) {
-        if (!p.alive || !d.alive) return;
-        if (d.ownerId === p.ownerId) return;
-        if (friendly(p.team, d.team)) return;
+        if (!d.alive || !p.alive) return;
         if (Math.hypot(d.x - p.x, d.y - p.y) <= (d.radius || 16) + p.radius) {
           d.hp = (d.hp || 20) - p.dmg;
-          combat.spawnParticle(d.x, d.y, "#ffb347", 10, 90);
           p.alive = false;
           if (d.hp <= 0) d.alive = false;
+          combat.spawnParticle(d.x, d.y, "#ffb347", 12, 90);
         }
       });
     });
     combat.projectiles.releaseDead(function (p) { return !p.alive; });
-
-    for (var ei = combat.effects.length - 1; ei >= 0; ei--) {
-      var e = combat.effects[ei];
-      if (e.type === "blackhole") {
-        e.life -= dt;
-        for (var bi = 0; bi < targets.length; bi++) {
-          var bt = targets[bi];
-          if (!bt || bt.hp <= 0) continue;
-          if (bt.netId === e.ownerId) continue;
-          var bdx = e.x - bt.x, bdy = e.y - bt.y;
-          var bd = Math.hypot(bdx, bdy) || 1;
-          if (bd < (e.radius || 160)) {
-            var pull = (e.pull || 400) * dt / bd;
-            bt.vx += (bdx / bd) * pull;
-            bt.vy += (bdy / bd) * pull;
-            if (bd < 50) applyDamage(bt, (e.dmg || 8) * dt, e.team, e.ownerId);
-          }
-        }
-        if (e.life <= 0) combat.effects.splice(ei, 1);
-      } else if (e.type === "laser" || e.type === "orbital") {
-        e.life -= dt;
-        var range = e.range || 700;
-        var x2 = e.x + Math.cos(e.angle) * range;
-        var y2 = e.y + Math.sin(e.angle) * range;
-        for (var k = 0; k < targets.length; k++) {
-          var sh = targets[k];
-          if (!sh || sh.hp <= 0) continue;
-          if (sh.netId === e.ownerId || sh.id === e.ownerId) continue;
-          if (friendly(e.team, sh.team)) continue;
-          if (segmentHit(e.x, e.y, x2, y2, sh.x, sh.y, (sh.radius || 18) + (e.width || 3))) {
-            applyDamage(sh, e.dmg * (e.type === "orbital" ? dt * 2 : 1), e.team, e.ownerId);
-            combat.spawnParticle(sh.x, sh.y, e.color || "#00f5ff", 4, 60);
-          }
-        }
-        if (e.life <= 0) combat.effects.splice(ei, 1);
-      } else if (e.type === "empRing") {
-        e.r += (e.maxR / 0.45) * dt;
-        e.life -= dt;
-        if (e.r >= e.maxR * 0.5 && !e.applied) {
-          e.applied = true;
-          for (var m = 0; m < targets.length; m++) {
-            var tg = targets[m];
-            if (!tg || Math.hypot(tg.x - e.x, tg.y - e.y) > e.maxR) continue;
-            if (tg.netId === e.ownerId) continue;
-            if (friendly(e.team, tg.team)) continue;
-            tg.empUntil = now + 2.8;
-            applyDamage(tg, 6, e.team, e.ownerId);
-            if (tg === localPlayer && loadout) loadout.empUntil = now + 2.8;
-          }
-        }
-        if (e.life <= 0) combat.effects.splice(ei, 1);
-      } else {
-        e.life -= dt;
-        if (e.life <= 0) combat.effects.splice(ei, 1);
-      }
-    }
-
     combat.mines.forEach(function (m) {
       if (!m.alive) return;
       if (m.arm > 0) { m.arm -= dt; return; }
-      for (var i = 0; i < targets.length; i++) {
-        var t = targets[i];
-        if (!t || t.hp <= 0) continue;
-        if (t.netId === m.ownerId) continue;
-        if (friendly(m.team, t.team)) continue;
+      m.life -= dt;
+      if (m.life <= 0) { m.alive = false; return; }
+      targets.forEach(function (t) {
+        if (!t || !t.alive || t.netId === m.ownerId) return;
+        if (friendly(m.team, t.team)) return;
         if (Math.hypot(t.x - m.x, t.y - m.y) < m.aoe * 0.55) {
           explodeAt(combat, m.x, m.y, m.aoe, m.dmg, m.ownerId, m.team, targets);
           m.alive = false;
-          break;
         }
-      }
+      });
     });
     combat.mines.releaseDead(function (m) { return !m.alive; });
-
     combat.decoys.forEach(function (d) {
       if (!d.alive) return;
-      d.angle += (d.turn || 0) * dt;
-      d.vx += Math.cos(d.angle) * 40 * dt;
-      d.vy += Math.sin(d.angle) * 40 * dt;
-      d.vx *= Math.exp(-0.8 * dt);
-      d.vy *= Math.exp(-0.8 * dt);
-      d.x += d.vx * dt;
-      d.y += d.vy * dt;
       d.life -= dt;
-      if (d.life <= 0 || (d.hp != null && d.hp <= 0)) d.alive = false;
+      if (d.life <= 0) d.alive = false;
+      d.x += (d.vx || 0) * dt; d.y += (d.vy || 0) * dt;
     });
     combat.decoys.releaseDead(function (d) { return !d.alive; });
-
+    updateSpecialEffects(combat, dt, localPlayer, remotes);
     combat.particles.forEach(function (p) {
-      if (!p.alive) return;
-      p.x += p.vx * dt; p.y += p.vy * dt;
-      p.vx *= 0.96; p.vy *= 0.96;
-      p.life -= dt;
+      p.life -= dt; p.x += (p.vx || 0) * dt; p.y += (p.vy || 0) * dt;
       if (p.life <= 0) p.alive = false;
     });
     combat.particles.releaseDead(function (p) { return !p.alive; });
   }
-
-  function segmentHit(x1, y1, x2, y2, cx, cy, r) {
-    var dx = x2 - x1, dy = y2 - y1;
-    var len2 = dx * dx + dy * dy || 1;
-    var t = Math.max(0, Math.min(1, ((cx - x1) * dx + (cy - y1) * dy) / len2));
-    var px = x1 + t * dx, py = y1 + t * dy;
-    return Math.hypot(cx - px, cy - py) <= r;
-  }
-
-  global.WWNCombatUpdate = { update: updateCombat, applyDamage: applyDamage, friendly: friendly };
+  global.WWNCombatUpdate = { update: updateCombat, friendly: friendly };
 })(typeof window !== "undefined" ? window : globalThis);
