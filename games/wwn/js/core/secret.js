@@ -4,77 +4,71 @@
     orbital: { name: "衛星レーザー", slot: "secret" },
     blackhole: { name: "ブラックホール", slot: "secret" },
     overdrive: { name: "ゴーストウィング", slot: "secret" },
-    mirage: { name: "ミラージュ艦隊", slot: "secret" },
+    mirage: { name: "ミラージュ", slot: "secret" },
     cyber: { name: "サイバーストーム", slot: "secret" },
-    voidcannon: { name: "ヴォイドキャノン", slot: "secret" },
+    voidcannon: { name: "ヴォイド砲", slot: "secret" },
     phoenix: { name: "フェニックス", slot: "secret" },
-    storm: { name: "ストームブレイカー", slot: "secret" },
-    neonblade: { name: "ネオンブレイド", slot: "secret" },
-    warp: { name: "ワープドライブ", slot: "secret" },
-    wingman: { name: "味方トリオ", slot: "secret" },
-    squadron: { name: "小隊展開", slot: "secret" },
-    bastion: { name: "ガーディアン増援", slot: "secret" },
-    hunter: { name: "ストライカー増援", slot: "secret" },
-    specter: { name: "ファントム増援", slot: "secret" },
-    airdrop: { name: "補給投下", slot: "secret" },
-    fortify: { name: "装甲強化", slot: "secret" },
-    blitz: { name: "電撃突撃", slot: "secret" },
-    silence: { name: "全域チャフ", slot: "secret" },
-    nova: { name: "ノヴァ爆発", slot: "secret" },
+    storm: { name: "ストーム", slot: "secret" },
+    neonblade: { name: "ネオン刃", slot: "secret" },
+    warp: { name: "ワープ", slot: "secret" },
+    airdrop: { name: "補給", slot: "secret" },
+    fortify: { name: "装甲", slot: "secret" },
+    blitz: { name: "ブリッツ", slot: "secret" },
+    silence: { name: "サイレンス", slot: "secret" },
+    nova: { name: "ノヴァ", slot: "secret" },
     gravity: { name: "重力井戸", slot: "secret" },
-    mirror: { name: "ミラー分身", slot: "secret" },
-    terminal: { name: "コマンドターミナル", slot: "secret" },
+    droneswarm: { name: "ドローンスウォーム", slot: "secret" },
+    turretpod: { name: "自動砲塔", slot: "secret" },
+    leech: { name: "リーチ寄生", slot: "secret" },
+    shieldwall: { name: "シールドウォール", slot: "secret" },
+    hive: { name: "ハイブ変換", slot: "secret" },
+    tether: { name: "テザー錨", slot: "secret" },
+    wingman: { name: "旧式僚機", slot: "secret" },
+    terminal: { name: "ターミナル", slot: "secret" },
   };
-  var PHRASES = [
-    ["orbitallaser", "orbital"], ["blackholecore", "blackhole"], ["ghostwing", "overdrive"],
-    ["miragefleet", "mirage"], ["cyberstorm", "cyber"], ["voidcannon", "voidcannon"],
-    ["phoenixkit", "phoenix"], ["stormbreaker", "storm"], ["neonblade", "neonblade"],
-    ["warpdrive", "warp"], ["wingman", "wingman"], ["squadron", "squadron"],
-    ["bastioncall", "bastion"], ["huntercall", "hunter"], ["spectercall", "specter"],
-    ["supplydrop", "airdrop"], ["fortifyshell", "fortify"], ["blitzrush", "blitz"],
-    ["silencerain", "silence"], ["novaburst", "nova"], ["gravitywell", "gravity"],
-    ["mirrorself", "mirror"], ["rootaccess", "terminal"], ["console", "terminal"],
-  ];
-  var hashToEffect = Object.create(null);
+  var PHRASES = {
+    orbitallaser: "orbital", blackholecore: "blackhole", ghostwing: "overdrive",
+    miragefleet: "mirage", cyberstorm: "cyber", voidcannon: "voidcannon",
+    phoenixkit: "phoenix", stormbreaker: "storm", neonblade: "neonblade",
+    warpdrive: "warp", supplydrop: "airdrop", fortifyshell: "fortify",
+    blitzrush: "blitz", silencerain: "silence", novaburst: "nova",
+    gravitywell: "gravity", droneswarm: "droneswarm", turretpod: "turretpod",
+    leechbite: "leech", shieldwall: "shieldwall", hiveconvert: "hive",
+    tetheranchor: "tether", wingman: "wingman",
+    rootaccess: "terminal", console: "terminal",
+  };
   var unlocked = Object.create(null);
-  var ready = false, buffer = "", lastKey = 0;
-  var STORAGE_KEY = "wwn_secret_unlocks_v1";
-  function loadPersisted() {
-    try {
-      var raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      var arr = JSON.parse(raw);
-      if (Array.isArray(arr)) arr.forEach(function (id) { unlocked[id] = true; });
-    } catch (_) {}
-  }
-  function savePersisted() {
+  var buffer = "", lastKey = 0, pendingNotify = null;
+  var STORAGE_KEY = "wwn_secret_unlocks_v2";
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) JSON.parse(raw).forEach(function (id) { unlocked[id] = true; });
+  } catch (_) {}
+  function save() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.keys(unlocked).filter(function (k) { return unlocked[k]; })));
     } catch (_) {}
   }
-  loadPersisted();
-  async function sha256Hex(str) {
-    var buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
-    return Array.from(new Uint8Array(buf)).map(function (b) {
-      return b.toString(16).padStart(2, "0");
-    }).join("");
+  function unlock(id) {
+    if (!id || !EFFECT_META[id]) return null;
+    var first = !unlocked[id];
+    unlocked[id] = true; save();
+    if (first) pendingNotify = id;
+    return id;
   }
-  async function init() {
-    for (var i = 0; i < PHRASES.length; i++) {
-      hashToEffect[await sha256Hex(PHRASES[i][0])] = PHRASES[i][1];
-    }
-    ready = true;
-  }
-  init();
   function onKey(ch) {
     if (!ch || ch.length !== 1) return;
     if (global.WWNTerminal && WWNTerminal.isOpen && WWNTerminal.isOpen()) return;
     var now = performance.now();
-    if (now - lastKey > 3200) buffer = "";
+    if (now - lastKey > 3500) buffer = "";
     lastKey = now;
-    if (/[a-zA-Z0-9]/.test(ch)) {
-      buffer += ch.toLowerCase();
-      if (buffer.length > 48) buffer = buffer.slice(-48);
+    if (!/[a-zA-Z0-9]/.test(ch)) return;
+    buffer += ch.toLowerCase();
+    if (buffer.length > 40) buffer = buffer.slice(-40);
+    if (PHRASES[buffer]) { unlock(PHRASES[buffer]); buffer = ""; return; }
+    for (var len = Math.min(buffer.length, 20); len >= 6; len--) {
+      var slice = buffer.slice(-len);
+      if (PHRASES[slice]) { unlock(PHRASES[slice]); buffer = ""; return; }
     }
   }
   if (typeof window !== "undefined") {
@@ -83,180 +77,100 @@
       if (e.key && e.key.length === 1) onKey(e.key);
     }, true);
   }
-  function _unlock(effectId) {
-    unlocked[effectId] = true;
-    savePersisted();
-    return effectId;
-  }
-  async function tryResolve() {
-    if (!ready || buffer.length < 5) return null;
-    var h = await sha256Hex(buffer);
-    var effect = hashToEffect[h];
-    if (effect) { buffer = ""; return _unlock(effect); }
-    for (var len = Math.min(buffer.length, 28); len >= 6; len--) {
-      h = await sha256Hex(buffer.slice(-len));
-      effect = hashToEffect[h];
-      if (effect) { buffer = ""; return _unlock(effect); }
+  function tryResolve() {
+    if (pendingNotify) {
+      var id = pendingNotify; pendingNotify = null;
+      return Promise.resolve(id);
     }
-    return null;
+    return Promise.resolve(null);
   }
   function applyEffect(effectId, player, combat, api) {
     if (!player || !effectId) return false;
     api = api || {};
-    var C = global.WWNConfig;
-    if (effectId === "orbital" && combat) {
-      var ang = player.angle, range = 1400;
-      combat.effects.push({
-        type: "orbitalBeam", x: player.x, y: player.y, angle: ang,
-        range: range, life: 0.85, maxLife: 0.85, width: 22, color: "#ff3366",
-        ownerId: player.netId, team: player.team,
+    var C = global.WWNConfig || { HP_MAX: 100, BOOST_MAX: 100, MAX_SPEED: 400 };
+    function dmgRay(ang, range, dmg, width) {
+      if (api.damageRay) { api.damageRay(player.x, player.y, ang, range, dmg, width || 24, player); return; }
+      var list = (api.getEnemies && api.getEnemies()) || [];
+      list.forEach(function (t) {
+        if (!t || !t.alive) return;
+        var dx = t.x - player.x, dy = t.y - player.y, dist = Math.hypot(dx, dy);
+        if (dist > range) return;
+        var angTo = Math.atan2(dy, dx), diff = angTo - ang;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        if (Math.abs(diff) < 0.15) t.hp = Math.max(0, t.hp - dmg);
       });
-      combat.effects.push({
-        type: "laser", x: player.x, y: player.y, angle: ang,
-        range: range, dmg: 55, ownerId: player.netId, team: player.team,
-        color: "#ff3366", width: 14, life: 0.2,
-      });
-      if (api.damageRay) api.damageRay(player.x, player.y, ang, range, 55, 28, player);
-      combat.spawnParticle(player.x, player.y, "#ff3366", 40, 220);
-      return true;
     }
-    if (effectId === "blackhole" && combat) {
-      combat.effects.push({
-        type: "blackhole", x: player.x + Math.cos(player.angle) * 180,
-        y: player.y + Math.sin(player.angle) * 180,
-        r: 0, maxR: 160, life: 4.5, pull: 420, dmg: 0.35,
-        ownerId: player.netId, team: player.team,
-      });
-      combat.spawnParticle(player.x, player.y, "#9b5de5", 36, 200);
-      return true;
+    function pushFx(fx) { if (combat && combat.effects) combat.effects.push(fx); }
+    function boom(color, n) { if (combat && combat.spawnParticle) combat.spawnParticle(player.x, player.y, color || "#00f5ff", n || 24, 160); }
+    if (effectId === "orbital") {
+      pushFx({ type: "orbitalBeam", x: player.x, y: player.y, angle: player.angle, range: 1400, life: 0.9, width: 22, color: "#ff3366", ownerId: player.netId, team: player.team });
+      pushFx({ type: "laser", x: player.x, y: player.y, angle: player.angle, range: 1400, dmg: 60, ownerId: player.netId, team: player.team, color: "#ff3366", width: 14, life: 0.25 });
+      dmgRay(player.angle, 1400, 60, 30); boom("#ff3366", 40); return true;
     }
-    if (effectId === "overdrive") {
-      player.boost = C.BOOST_MAX;
-      player.hp = Math.min(C.HP_MAX, player.hp + 35);
-      if (combat) combat.spawnParticle(player.x, player.y, "#00f5ff", 30, 180);
-      return true;
+    if (effectId === "blackhole" || effectId === "gravity") {
+      var dist = effectId === "gravity" ? 120 : 180;
+      pushFx({ type: "blackhole", x: player.x + Math.cos(player.angle) * dist, y: player.y + Math.sin(player.angle) * dist, r: 20, maxR: effectId === "gravity" ? 200 : 160, life: 5, pull: effectId === "gravity" ? 520 : 420, dmg: 0.3, ownerId: player.netId, team: player.team });
+      boom("#9b5de5", 30); return true;
     }
-    if (effectId === "mirage" && combat && combat._spawnDecoy) {
-      for (var i = 0; i < 4; i++) combat._spawnDecoy(player, global.WWNWeapons.decoy);
-      return true;
+    if (effectId === "overdrive") { player.boost = C.BOOST_MAX; player.hp = Math.min(C.HP_MAX, (player.hp || 0) + 35); boom("#00f5ff", 28); return true; }
+    if (effectId === "phoenix") { player.hp = C.HP_MAX; player.boost = C.BOOST_MAX; boom("#ff6bb5", 40); return true; }
+    if (effectId === "warp") { player.x += Math.cos(player.angle) * 380; player.y += Math.sin(player.angle) * 380; boom("#7df9ff", 20); return true; }
+    if (effectId === "blitz") { player.boost = C.BOOST_MAX; player.vx = Math.cos(player.angle) * C.MAX_SPEED * 1.5; player.vy = Math.sin(player.angle) * C.MAX_SPEED * 1.5; boom("#ef5350", 24); return true; }
+    if (effectId === "fortify") { player.hp = Math.min(C.HP_MAX * 1.4, (player.hp || 0) + 55); player._fortifyUntil = performance.now() / 1000 + 8; boom("#66bb6a", 28); return true; }
+    if (effectId === "airdrop") { if (api.refill) api.refill(); player.hp = Math.min(C.HP_MAX, (player.hp || 0) + 40); player.boost = C.BOOST_MAX; boom("#ffd700", 24); return true; }
+    if (effectId === "cyber" || effectId === "nova" || effectId === "silence") {
+      var aoe = effectId === "nova" ? 320 : (effectId === "silence" ? 600 : 480);
+      var dmg = effectId === "nova" ? 30 : 10;
+      if (combat && combat.events) combat.events.push({ t: "emp", x: player.x, y: player.y, aoe: aoe, duration: effectId === "silence" ? 5 : 3.5, dmg: dmg, ownerId: player.netId, team: player.team });
+      pushFx({ type: "empRing", x: player.x, y: player.y, r: 0, maxR: aoe, life: 0.6, color: effectId === "nova" ? "#ff2d95" : (effectId === "silence" ? "#ffe066" : "#9b5de5") });
+      if (effectId === "silence" && api.globalChaff) api.globalChaff(5);
+      if (effectId === "nova" && api.novaDamage) api.novaDamage(player, aoe, dmg);
+      boom("#9b5de5", 36); return true;
     }
-    if (effectId === "cyber" && combat) {
-      combat.events.push({ t: "emp", x: player.x, y: player.y, aoe: 480, duration: 4.5, dmg: 10, ownerId: player.netId, team: player.team });
-      combat.effects.push({ type: "empRing", x: player.x, y: player.y, r: 0, maxR: 480, life: 0.7, color: "#9b5de5" });
-      return true;
-    }
-    if (effectId === "voidcannon" && combat) {
-      var p = combat.projectiles.acquire();
-      p.alive = true; p.type = "plasma";
-      p.x = player.x + Math.cos(player.angle) * 28;
-      p.y = player.y + Math.sin(player.angle) * 28;
-      p.angle = player.angle;
-      p.vx = Math.cos(player.angle) * 500 + (player.vx || 0) * 0.2;
-      p.vy = Math.sin(player.angle) * 500 + (player.vy || 0) * 0.2;
-      p.life = 2.2; p.maxLife = 2.2; p.dmg = 48; p.aoe = 110;
-      p.ownerId = player.netId; p.team = player.team;
-      p.radius = 14; p.color = "#7b2cbf"; p.targetId = null; p.turn = 0; p.split = 0;
-      return true;
-    }
-    if (effectId === "phoenix") {
-      player.hp = C.HP_MAX; player.boost = C.BOOST_MAX;
-      if (combat) combat.spawnParticle(player.x, player.y, "#ff6bb5", 40, 200);
-      return true;
-    }
-    if (effectId === "storm" && combat) {
+    if (effectId === "storm" && combat && combat.projectiles) {
       for (var s = -4; s <= 4; s++) {
-        var sp = combat.projectiles.acquire();
+        var sp = combat.projectiles.acquire(); if (!sp) break;
         var a = player.angle + s * 0.1;
-        sp.alive = true; sp.type = "vulcan";
-        sp.x = player.x + Math.cos(player.angle) * 20;
-        sp.y = player.y + Math.sin(player.angle) * 20;
-        sp.angle = a; sp.vx = Math.cos(a) * 980; sp.vy = Math.sin(a) * 980;
-        sp.life = 1.1; sp.maxLife = 1.1; sp.dmg = 9;
-        sp.ownerId = player.netId; sp.team = player.team;
-        sp.radius = 4; sp.aoe = 0; sp.color = "#ffe066";
-        sp.targetId = null; sp.turn = 0; sp.split = 0;
+        sp.alive = true; sp.type = "vulcan"; sp.x = player.x + Math.cos(player.angle) * 20; sp.y = player.y + Math.sin(player.angle) * 20;
+        sp.angle = a; sp.vx = Math.cos(a) * 980; sp.vy = Math.sin(a) * 980; sp.life = 1.1; sp.maxLife = 1.1; sp.dmg = 9;
+        sp.ownerId = player.netId; sp.team = player.team; sp.radius = 4; sp.aoe = 0; sp.color = "#ffe066"; sp.targetId = null; sp.turn = 0; sp.split = 0;
       }
       return true;
     }
-    if (effectId === "neonblade" && combat) {
-      combat.effects.push({
-        type: "laser", x: player.x, y: player.y, angle: player.angle,
-        range: 260, dmg: 40, ownerId: player.netId, team: player.team,
-        color: "#39ff14", width: 10, life: 0.15,
-      });
+    if (effectId === "voidcannon" && combat && combat.projectiles) {
+      var p = combat.projectiles.acquire();
+      if (p) {
+        p.alive = true; p.type = "plasma"; p.x = player.x + Math.cos(player.angle) * 28; p.y = player.y + Math.sin(player.angle) * 28;
+        p.angle = player.angle; p.vx = Math.cos(player.angle) * 500; p.vy = Math.sin(player.angle) * 500;
+        p.life = 2.2; p.maxLife = 2.2; p.dmg = 50; p.aoe = 110; p.ownerId = player.netId; p.team = player.team;
+        p.radius = 14; p.color = "#7b2cbf"; p.targetId = null; p.turn = 0; p.split = 0;
+      }
       return true;
     }
-    if (effectId === "warp") {
-      player.x += Math.cos(player.angle) * 380;
-      player.y += Math.sin(player.angle) * 380;
-      if (combat) combat.spawnParticle(player.x, player.y, "#7df9ff", 24, 160);
-      return true;
+    if (effectId === "neonblade") {
+      pushFx({ type: "laser", x: player.x, y: player.y, angle: player.angle, range: 260, dmg: 42, ownerId: player.netId, team: player.team, color: "#39ff14", width: 10, life: 0.15 });
+      dmgRay(player.angle, 260, 42, 20); return true;
     }
-    if (effectId === "wingman" && api.spawnAlly) { api.spawnAlly(3); if (combat) combat.spawnParticle(player.x, player.y, "#4fc3f7", 28, 160); return true; }
-    if (effectId === "squadron" && api.spawnAlly) { api.spawnAlly(3); if (combat) combat.spawnParticle(player.x, player.y, "#4fc3f7", 40, 200); return true; }
-    if (effectId === "bastion" && api.spawnAllyType) { api.spawnAllyType("guardian", 2); return true; }
-    if (effectId === "hunter" && api.spawnAllyType) { api.spawnAllyType("striker", 2); return true; }
-    if (effectId === "specter" && api.spawnAllyType) { api.spawnAllyType("phantom", 2); return true; }
-    if (effectId === "airdrop" && api.refill) {
-      api.refill(); player.hp = Math.min(C.HP_MAX, player.hp + 40); player.boost = C.BOOST_MAX;
-      if (combat) combat.spawnParticle(player.x, player.y, "#ffd700", 24, 160); return true;
+    if (effectId === "mirage") {
+      if (combat && combat._spawnDecoy && global.WWNWeapons && WWNWeapons.decoy) for (var i = 0; i < 4; i++) combat._spawnDecoy(player, WWNWeapons.decoy);
+      boom("#ffb347", 20); return true;
     }
-    if (effectId === "fortify") {
-      player.hp = Math.min(C.HP_MAX * 1.5, player.hp + 60);
-      if (api.fortify) api.fortify(8);
-      if (combat) combat.spawnParticle(player.x, player.y, "#66bb6a", 30, 180); return true;
-    }
-    if (effectId === "blitz") {
-      player.boost = C.BOOST_MAX;
-      player.vx = Math.cos(player.angle) * C.MAX_SPEED * 1.4;
-      player.vy = Math.sin(player.angle) * C.MAX_SPEED * 1.4;
-      if (combat) combat.spawnParticle(player.x, player.y, "#ef5350", 28, 160); return true;
-    }
-    if (effectId === "silence" && combat) {
-      if (api.globalChaff) api.globalChaff(5);
-      combat.spawnParticle(player.x, player.y, "#eee", 50, 200);
-      combat.effects.push({ type: "empRing", x: player.x, y: player.y, r: 0, maxR: 600, life: 0.5, color: "#ffe066" });
-      return true;
-    }
-    if (effectId === "nova" && combat) {
-      combat.events.push({ t: "emp", x: player.x, y: player.y, aoe: 320, duration: 1.2, dmg: 28, ownerId: player.netId, team: player.team });
-      combat.effects.push({ type: "empRing", x: player.x, y: player.y, r: 0, maxR: 320, life: 0.55, color: "#ff2d95" });
-      if (api.novaDamage) api.novaDamage(player, 320, 28);
-      return true;
-    }
-    if (effectId === "gravity" && combat) {
-      combat.effects.push({
-        type: "blackhole", x: player.x + Math.cos(player.angle) * 120,
-        y: player.y + Math.sin(player.angle) * 120,
-        r: 40, maxR: 200, life: 5, pull: 520, dmg: 0.2,
-        ownerId: player.netId, team: player.team,
-      });
-      return true;
-    }
-    if (effectId === "mirror" && combat && combat._spawnDecoy) {
-      for (var m = 0; m < 2; m++) combat._spawnDecoy(player, global.WWNWeapons.decoy);
-      return true;
-    }
-    if (effectId === "terminal") {
-      if (global.WWNTerminal) WWNTerminal.open(api);
-      return true;
-    }
+    if (effectId === "droneswarm") { if (api.spawnDrones) api.spawnDrones(6); boom("#4fc3f7", 30); return true; }
+    if (effectId === "turretpod") { if (api.spawnTurret) api.spawnTurret(); boom("#ff9800", 24); return true; }
+    if (effectId === "leech") { if (api.spawnLeech) api.spawnLeech(); boom("#c62828", 20); return true; }
+    if (effectId === "shieldwall") { if (api.spawnShield) api.spawnShield(6); player._shieldUntil = performance.now() / 1000 + 6; boom("#81d4fa", 28); return true; }
+    if (effectId === "hive") { if (api.hiveConvert) api.hiveConvert(); boom("#ce93d8", 32); return true; }
+    if (effectId === "tether") { if (api.spawnTether) api.spawnTether(); boom("#ffd54f", 24); return true; }
+    if (effectId === "wingman") { if (api.spawnAlly) api.spawnAlly(3); boom("#4fc3f7", 24); return true; }
+    if (effectId === "terminal") { if (global.WWNTerminal) WWNTerminal.open(api); return true; }
     return false;
   }
   global.WWNSecret = {
-    onKey: onKey,
-    tryResolve: tryResolve,
-    applyEffect: applyEffect,
+    onKey: onKey, tryResolve: tryResolve, applyEffect: applyEffect, unlock: unlock,
     isUnlocked: function (id) { return !!unlocked[id]; },
-    getUnlockedList: function () {
-      return Object.keys(unlocked).filter(function (k) { return unlocked[k]; });
-    },
-    getMeta: function (id) {
-      return EFFECT_META[id] || { name: id, slot: "secret" };
-    },
-    unlock: _unlock,
-    listPhrasesDev: function () {
-      return PHRASES.map(function (p) { return p[0] + " → " + p[1]; });
-    },
+    getUnlockedList: function () { return Object.keys(unlocked).filter(function (k) { return unlocked[k]; }); },
+    getMeta: function (id) { return EFFECT_META[id] || { name: id, slot: "secret" }; },
+    listPhrasesDev: function () { return Object.keys(PHRASES).map(function (p) { return p + " → " + PHRASES[p]; }); },
   };
 })(typeof window !== "undefined" ? window : globalThis);
