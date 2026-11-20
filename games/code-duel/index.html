@@ -2,75 +2,174 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>G_GAMES - Code Duel | WebRTC P2P Programming Battle</title>
-  <meta name="description" content="リアルタイム・プログラミング対戦ゲーム。5つのオリジナル言語で機体AIを記述し、P2Pで戦う。" />
-  <link rel="stylesheet" href="css/style.css" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@500;700&display=swap" rel="stylesheet" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#07050f" />
+  <title>CODE DUEL · G_GAMES</title>
+  <link rel="stylesheet" href="css/lobby.css" />
+  <link rel="stylesheet" href="css/game.css" />
 </head>
 <body>
-  <div id="app">
-    <header class="header">
-      <div class="logo">
-        <span class="logo-text">G_GAMES</span>
-        <span class="logo-sub">CODE DUEL</span>
-      </div>
-      <div class="status-bar">
-        <div class="connection-status" id="connectionStatus">
-          <span class="dot"></span>
-          <span class="text">DISCONNECTED</span>
-        </div>
-        <div class="room-info" id="roomInfo">Room: ---</div>
-      </div>
-      <div class="header-actions">
-        <button id="btnHost" class="btn btn-primary">HOST</button>
-        <button id="btnJoin" class="btn btn-secondary">JOIN</button>
-        <input type="text" id="roomIdInput" placeholder="Room ID" maxlength="8" class="room-input" />
-      </div>
+  <div class="lobby-wrap" id="lobby-wrap">
+    <header class="lobby-header">
+      <a href="../../index.html" class="back">← G_GAMES ホーム</a>
+      <h1>CODE DUEL</h1>
+      <p>リアルタイム・プログラミング対戦 · ロビー</p>
     </header>
 
+    <div class="panel guide-panel" id="guide-panel">
+      <div class="panel-title">操作ガイド</div>
+      <div class="guide-grid">
+        <div>
+          <h4>基本フロー</h4>
+          <ul>
+            <li>言語を選びコードを書く</li>
+            <li><kbd>Ctrl</kbd>+<kbd>Enter</kbd> でAIデプロイ</li>
+            <li>相手コードは右側に透けて表示</li>
+            <li>読み合いで対策を書く</li>
+          </ul>
+        </div>
+        <div>
+          <h4>戦闘</h4>
+          <ul>
+            <li>推力・旋回・弾・シールド</li>
+            <li>EN と HEAT に注意</li>
+            <li>壁反射あり・直接ダメージ指定禁止</li>
+            <li>HP 0 で敗北</li>
+          </ul>
+        </div>
+        <div>
+          <h4>言語</h4>
+          <ul>
+            <li><strong>NoviceScript</strong> … 初心者向け</li>
+            <li><strong>CyberScript</strong> … 標準手続き型</li>
+            <li><strong>Vectra</strong> … ベクトル軌道</li>
+            <li><strong>ShadowScript</strong> … 1文字難解</li>
+            <li><strong>CyberHack</strong> … 電子戦</li>
+          </ul>
+        </div>
+        <div>
+          <h4>ヒント</h4>
+          <ul>
+            <li>最初は NoviceScript の chase から</li>
+            <li>連射しすぎるとオーバーヒート</li>
+            <li>ドキュメントは HELP / DOCS から</li>
+            <li>シークレットはロビーで入力…</li>
+          </ul>
+        </div>
+      </div>
+      <button type="button" class="btn btn-ghost" id="btn-toggle-guide" style="width:100%;margin-top:0.75rem;">ガイドを折りたたむ</button>
+    </div>
+
+    <div class="panel" id="cpu-panel">
+      <div class="panel-title">CPU対戦</div>
+      <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:0.75rem;">相手CPUのコーディング速度（WPM）で難易度が変わります。5段階。</p>
+      <div class="field">
+        <label>難易度（相手WPM）</label>
+        <div class="mode-grid" id="diff-grid">
+          <button type="button" class="mode-btn" data-diff="1">Lv1<br><small>20WPM</small></button>
+          <button type="button" class="mode-btn" data-diff="2">Lv2<br><small>40WPM</small></button>
+          <button type="button" class="mode-btn active" data-diff="3">Lv3<br><small>60WPM</small></button>
+          <button type="button" class="mode-btn" data-diff="4">Lv4<br><small>80WPM</small></button>
+          <button type="button" class="mode-btn" data-diff="5">Lv5<br><small>100WPM</small></button>
+        </div>
+        <p class="diff-desc" id="diff-desc">標準的な反応速度。バランス型AI。</p>
+      </div>
+      <button type="button" class="btn btn-primary" id="btn-cpu-start" style="width:100%;">CPU戦を開始</button>
+    </div>
+
+    <div class="panel" id="form-panel">
+      <div class="panel-title">ルーム設定（オンライン P2P）</div>
+      <div class="field">
+        <label for="username">ユーザー名</label>
+        <input type="text" id="username" placeholder="例: CodeAce" maxlength="24" />
+      </div>
+      <div class="field">
+        <label for="room-id">ルームID（参加時）</label>
+        <input type="text" id="room-id" placeholder="HOST後に表示 / 参加するID" maxlength="8" style="text-transform:uppercase;" />
+      </div>
+      <div class="actions">
+        <button type="button" class="btn btn-primary" id="btn-host">ルームを作成（HOST）</button>
+        <button type="button" class="btn btn-ghost" id="btn-join">ルームに参加（JOIN）</button>
+      </div>
+      <div class="status-bar" style="margin-top:0.9rem;">
+        <span class="status-dot" id="lobby-status-dot"></span>
+        <span id="lobby-status-text">未接続</span>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="connected-panel">
+      <div class="panel-title">接続中</div>
+      <div class="status-bar">
+        <span class="status-dot online"></span>
+        <span id="conn-text">接続済み</span>
+      </div>
+      <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:0.75rem;">Room: <strong id="conn-room-id">—</strong></p>
+      <div class="actions">
+        <button type="button" class="btn btn-primary" id="btn-sortie">対戦開始</button>
+        <button type="button" class="btn btn-ghost" id="btn-leave">退出する</button>
+      </div>
+    </div>
+
+    <div class="panel hidden secret-panel" id="secret-panel">
+      <div class="panel-title">CtrlWorld UNLOCKED <span class="secret-unlocked-badge">SECRET</span></div>
+      <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:0.75rem;">制作者専用言語が解放されました。物理法則干渉コマンドが使用可能です。</p>
+      <div class="actions">
+        <a class="btn btn-ghost" href="docs/index.html?ctrlworld.md" target="_blank" rel="noopener" style="text-decoration:none;">CtrlWorld 使用方法を見る</a>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">ドキュメント</div>
+      <div class="actions">
+        <a class="btn btn-ghost" href="docs/index.html" target="_blank" rel="noopener" style="text-decoration:none;width:100%;">説明書・各言語リファレンス</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <div id="game-layer" class="hidden">
+    <header class="game-header">
+      <span class="logo-text">CODE DUEL</span>
+      <div class="meta">
+        <span><span class="dot"></span><span id="game-mode-label">CPU</span></span>
+        <span id="matchTimer">00:00</span>
+        <span id="matchStatus">FIGHTING</span>
+      </div>
+      <button type="button" class="btn-sm" id="btn-exit-game">ロビーへ戻る</button>
+    </header>
     <main class="main-layout">
-      <section class="panel editor-panel self-panel">
+      <section class="panel">
         <div class="panel-header">
           <h2>YOUR CODE</h2>
-          <div class="lang-select-wrap">
-            <label for="langSelect">Language</label>
-            <select id="langSelect">
-              <option value="novice">NoviceScript (初級)</option>
-              <option value="cyber">CyberScript</option>
-              <option value="vectra">Vectra</option>
-              <option value="shadow">ShadowScript</option>
-              <option value="cyberhack">CyberHack</option>
-              <option value="ctrlworld" disabled>CtrlWorld (LOCKED)</option>
-            </select>
-          </div>
+          <select id="langSelect">
+            <option value="novice">NoviceScript</option>
+            <option value="cyber">CyberScript</option>
+            <option value="vectra">Vectra</option>
+            <option value="shadow">ShadowScript</option>
+            <option value="cyberhack">CyberHack</option>
+            <option value="ctrlworld" id="opt-ctrlworld" disabled>CtrlWorld (LOCKED)</option>
+          </select>
         </div>
         <div class="editor-toolbar">
-          <button id="btnRun" class="btn btn-run" title="Ctrl + Enter">▶ RUN (Ctrl+Enter)</button>
-          <button id="btnStop" class="btn btn-stop">■ STOP</button>
+          <button type="button" class="btn-sm btn-run" id="btnRun">▶ RUN</button>
           <span class="energy-display" id="selfEnergy">EN: 100%</span>
           <span class="heat-display" id="selfHeat">HEAT: 0%</span>
         </div>
-        <textarea id="selfCode" class="code-editor" spellcheck="false" placeholder="// Select a language and write your AI code...\n// Press Ctrl + Enter to deploy"></textarea>
+        <textarea id="selfCode" class="code-editor" spellcheck="false" placeholder="// Write AI code... Ctrl+Enter"></textarea>
         <div class="console" id="selfConsole"></div>
       </section>
-
       <section class="panel battlefield-panel">
         <div class="panel-header">
           <h2>BATTLEFIELD</h2>
-          <div class="match-info">
-            <span id="matchTimer">00:00</span>
-            <span id="matchStatus">WAITING</span>
-          </div>
+          <span id="enemyLangLabel" style="font-size:0.72rem;color:#ff2d95;">—</span>
         </div>
         <div class="canvas-wrap">
           <canvas id="gameCanvas" width="800" height="600"></canvas>
           <div class="overlay" id="overlay">
             <div class="overlay-content">
               <h1 id="overlayTitle">CODE DUEL</h1>
-              <p id="overlayMessage">Host or Join a room to start</p>
+              <p id="overlayMessage">Ready</p>
             </div>
           </div>
         </div>
@@ -87,40 +186,35 @@
           </div>
         </div>
       </section>
-
-      <section class="panel editor-panel enemy-panel">
+      <section class="panel">
         <div class="panel-header">
           <h2>ENEMY CODE</h2>
-          <span class="enemy-lang" id="enemyLang">---</span>
         </div>
-        <div class="editor-toolbar enemy-toolbar">
-          <span class="hint">Read & Counter</span>
+        <div class="editor-toolbar">
+          <span style="font-size:0.7rem;color:#5a6a82;" id="cpu-wpm-label"></span>
         </div>
-        <textarea id="enemyCode" class="code-editor enemy-code" spellcheck="false" readonly placeholder="// Enemy code will appear here in real-time..."></textarea>
-        <div class="console enemy-console" id="enemyConsole"></div>
+        <textarea id="enemyCode" class="code-editor enemy-code" spellcheck="false" readonly></textarea>
+        <div class="console" id="enemyConsole"></div>
       </section>
     </main>
-
-    <footer class="footer">
+    <footer class="game-footer">
       <div class="footer-left">
-        <div class="help-toggle" id="helpToggle">[?] LANGUAGE HELP</div>
-        <a class="docs-link" href="docs/index.html" target="_blank" rel="noopener">[DOCS] 説明書</a>
-        <a class="docs-link" href="../../index.html">[HOME] ポータル</a>
+        <span class="help-toggle" id="helpToggle">[?] LANGUAGE HELP</span>
+        <a class="docs-link" href="docs/index.html" target="_blank" rel="noopener">[DOCS]</a>
       </div>
-      <div class="fps-counter" id="fpsCounter">FPS: --</div>
+      <span class="fps-counter" id="fpsCounter">FPS: --</span>
     </footer>
-
     <div class="modal" id="helpModal">
       <div class="modal-content">
         <button class="modal-close" id="helpClose">×</button>
         <h2>Language Reference</h2>
         <div class="help-tabs">
-          <button class="help-tab active" data-lang="novice">NoviceScript</button>
-          <button class="help-tab" data-lang="cyber">CyberScript</button>
+          <button class="help-tab active" data-lang="novice">Novice</button>
+          <button class="help-tab" data-lang="cyber">Cyber</button>
           <button class="help-tab" data-lang="vectra">Vectra</button>
-          <button class="help-tab" data-lang="shadow">ShadowScript</button>
+          <button class="help-tab" data-lang="shadow">Shadow</button>
           <button class="help-tab" data-lang="cyberhack">CyberHack</button>
-          <button class="help-tab" data-lang="ctrlworld">CtrlWorld</button>
+          <button class="help-tab secret-tab hidden" data-lang="ctrlworld" id="tab-ctrlworld">CtrlWorld</button>
         </div>
         <div class="help-body" id="helpBody"></div>
       </div>
