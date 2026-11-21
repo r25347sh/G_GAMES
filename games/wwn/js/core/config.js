@@ -3,9 +3,9 @@
   global.WWNConfig = {
     WORLD_SIZE: 9000, BORDER_WARN: 400, MAX_SPEED: 440, ACCEL: 560, DRAG: 1.9,
     TURN_RATE: 3.45, BOOST_MULT: 1.82, BOOST_DRAIN: 30, BOOST_REGEN: 14, BOOST_MAX: 100,
-    CAM_LOOKAHEAD: 110, CAM_SMOOTH: 9.5, HP_MAX: 320, SHIP_RADIUS: 18,
+    CAM_LOOKAHEAD: 110, CAM_SMOOTH: 9.5, HP_MAX: 560, SHIP_RADIUS: 18,
     SYNC_HZ: 20, INTERP_DELAY: 0.1, RESPAWN_SEC: 3.2,
-    MAX_PROJECTILES: 140, MAX_PARTICLES: 120, MAX_MINES: 18, MAX_DECOYS: 8,
+    MAX_PROJECTILES: 180, MAX_PARTICLES: 120, MAX_MINES: 18, MAX_DECOYS: 8,
   };
   global.WWNWeapons = {
     vulcan: { id: "vulcan", slot: "main", name: "バルカン", dmg: 6, rate: 10, speed: 880, life: 1.1, heat: 8, cool: 25, overheat: 100, color: "#ffd700", radius: 3 },
