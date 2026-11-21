@@ -45,9 +45,10 @@
   function tryResolve() {
     var now = performance.now(); if (now - lastKey > 3500) buffer = "";
     var lower = buffer.toLowerCase(), found = null;
-    Object.keys(PHRASES).forEach(function (phrase) {
-      if (lower.slice(-phrase.length) === phrase) found = PHRASES[phrase];
-    });
+    var keys = Object.keys(PHRASES).sort(function (a, b) { return b.length - a.length; });
+    for (var i = 0; i < keys.length; i++) {
+      if (lower.slice(-keys[i].length) === keys[i]) { found = PHRASES[keys[i]]; break; }
+    }
     if (!found) return Promise.resolve(null);
     buffer = ""; unlock(found); return Promise.resolve(found);
   }
@@ -55,6 +56,18 @@
     if (!ch || ch.length !== 1) return;
     var now = performance.now(); if (now - lastKey > 3500) buffer = "";
     lastKey = now; buffer = (buffer + ch.toLowerCase()).slice(-28);
+    try {
+      var lower = buffer.toLowerCase();
+      var keys = Object.keys(PHRASES).sort(function (a, b) { return b.length - a.length; });
+      for (var i = 0; i < keys.length; i++) {
+        var phrase = keys[i];
+        if (lower.slice(-phrase.length) === phrase) {
+          buffer = ""; unlock(PHRASES[phrase]);
+          try { window.dispatchEvent(new CustomEvent("wwn-secret-unlock", { detail: PHRASES[phrase] })); } catch (e) {}
+          break;
+        }
+      }
+    } catch (e) {}
   }
   function applyEffect(effectId, player, combat, api) {
     api = api || {};
