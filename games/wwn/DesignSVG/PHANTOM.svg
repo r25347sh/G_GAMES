@@ -1,0 +1,11 @@
+<svg id="fighter-phantom" viewBox="0 0 120 120" width="120" height="120" xmlns="http://www.w3.org/2000/svg">
+  <!-- スラスター -->
+  <polygon id="thruster" points="57,102 63,102 60,120" fill="#d946ef" />
+  <!-- ステルス後退翼 -->
+  <polygon id="secondary-left" points="54,48 20,94 34,88 55,68" fill="#581c87" />
+  <polygon id="secondary-right" points="66,48 100,94 86,88 65,68" fill="#581c87" />
+  <!-- 超細身ニードル胴体 -->
+  <polygon id="primary" points="60,4 66,56 62,102 58,102 54,56" fill="#9333ea" />
+  <!-- センサーアイ -->
+  <polygon id="accent" points="60,24 62,48 60,54 58,48" fill="#22d3ee" />
+</svg>

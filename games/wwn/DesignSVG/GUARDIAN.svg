@@ -1,0 +1,11 @@
+<svg id="fighter-guardian" viewBox="0 0 120 120" width="120" height="120" xmlns="http://www.w3.org/2000/svg">
+  <!-- スラスター -->
+  <polygon id="thruster" points="48,102 72,102 60,116" fill="#00e5ff" />
+  <!-- リアコアユニット -->
+  <polygon id="secondary" points="60,46 82,66 74,98 46,98 38,66" fill="#34495e" />
+  <!-- フロント大型シールド装甲（2分割スリット構造） -->
+  <polygon id="primary-left" points="57,14 14,42 22,82 40,62 57,40" fill="#2c3e50" />
+  <polygon id="primary-right" points="63,14 106,42 98,82 80,62 63,40" fill="#2c3e50" />
+  <!-- エネルギーコア -->
+  <polygon id="accent" points="60,54 68,66 60,82 52,66" fill="#38bdf8" />
+</svg>

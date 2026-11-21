@@ -1,0 +1,11 @@
+<svg id="fighter-medic" viewBox="0 0 120 120" width="120" height="120" xmlns="http://www.w3.org/2000/svg">
+  <!-- スラスター -->
+  <polygon id="thruster" points="52,96 68,96 60,110" fill="#10b981" />
+  <!-- フィールド展開ウイング -->
+  <polygon id="secondary-left" points="48,38 16,56 26,84 48,76" fill="#cbd5e1" />
+  <polygon id="secondary-right" points="72,38 104,56 94,84 72,76" fill="#cbd5e1" />
+  <!-- メインハル -->
+  <polygon id="primary" points="60,14 74,42 70,94 50,94 46,42" fill="#f8fafc" />
+  <!-- メディカルクロス（アクセント） -->
+  <path id="accent" d="M57,46 H63 V55 H72 V61 H63 V70 H57 V61 H48 V55 H57 Z" fill="#10b981" />
+</svg>

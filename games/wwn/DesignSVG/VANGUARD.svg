@@ -1,0 +1,11 @@
+<svg id="fighter-vanguard" viewBox="0 0 120 120" width="120" height="120" xmlns="http://www.w3.org/2000/svg">
+  <!-- スラスター -->
+  <polygon id="thruster" points="53,102 67,102 60,116" fill="#f59e0b" />
+  <!-- 翼端ビット（中距離ポッド） -->
+  <polygon id="secondary-left" points="22,48 10,60 22,72 26,60" fill="#1d4ed8" />
+  <polygon id="secondary-right" points="98,48 110,60 98,72 94,60" fill="#1d4ed8" />
+  <!-- 菱形メインボディ -->
+  <polygon id="primary" points="60,10 94,60 60,102 26,60" fill="#2563eb" />
+  <!-- 中央ダイヤモンドコア -->
+  <polygon id="accent" points="60,36 74,60 60,80 46,60" fill="#fbbf24" />
+</svg>
