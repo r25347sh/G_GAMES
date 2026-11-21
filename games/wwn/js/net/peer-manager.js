@@ -8,12 +8,16 @@
   var peer = null, master = null, connections = new Map();
   var amHost = false;
   var listeners = Object.create(null);
+
   function on(type, fn) { (listeners[type] ||= []).push(fn); }
-  function off(type, fn) { if (listeners[type]) listeners[type] = listeners[type].filter(function (x) { return x !== fn; }); }
+  function off(type, fn) {
+    if (listeners[type]) listeners[type] = listeners[type].filter(function (x) { return x !== fn; });
+  }
   function emit(type) {
     var args = Array.prototype.slice.call(arguments, 1);
     (listeners[type] || []).forEach(function (fn) { try { fn.apply(null, args); } catch (_) {} });
   }
+
   function loadPeerJS() {
     if (global.Peer) return Promise.resolve(global.Peer);
     return new Promise(function (resolve, reject) {
@@ -24,6 +28,7 @@
       document.head.appendChild(s);
     });
   }
+
   async function shaHex(text) {
     var b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
     return Array.from(new Uint8Array(b)).map(function (v) { return v.toString(16).padStart(2, "0"); }).join("");
@@ -35,11 +40,14 @@
     return encodeURIComponent(name).replace(/%/g, "-").slice(0, 20) + "_" + hash + "_" +
       encodeURIComponent(user).replace(/%/g, "-").slice(0, 24);
   }
+
   function setupConnection(conn) {
+    if (!conn) return;
     conn.on("open", function () {
       connections.set(conn.peer, conn);
       emit("connection", conn);
     });
+    if (conn.open) connections.set(conn.peer, conn);
     conn.on("data", function (data) { emit("data", data, conn); });
     conn.on("close", function () {
       connections.delete(conn.peer);
@@ -47,13 +55,16 @@
     });
     conn.on("error", function (err) { emit("error", err, conn); });
   }
+
   function newPeer(id) {
     return new global.Peer(id, { debug: 0, config: { iceServers: STUN_LIST } });
   }
+
   async function startPersonal(id) {
     await loadPeerJS();
     if (peer) try { peer.destroy(); } catch (_) {}
     connections.clear();
+    amHost = false;
     return new Promise(function (resolve, reject) {
       peer = newPeer(id);
       peer.on("open", function () { emit("open", id); resolve(id); });
@@ -62,6 +73,7 @@
       peer.on("disconnected", function () { emit("disconnected"); });
     });
   }
+
   function claimMaster(id, opts) {
     opts = opts || {};
     var retries = opts.retries || 5;
@@ -93,21 +105,23 @@
           settled = true;
           clearTimeout(timer);
           try { candidate.destroy(); } catch (_) {}
-          setTimeout(function () { tryOne(n + 1); }, 200);
+          setTimeout(function () { tryOne(n + 1); }, 250);
         });
       };
       tryOne(0);
     });
   }
+
   function releaseMaster() {
     amHost = false;
     if (master) { try { master.destroy(); } catch (_) {} master = null; }
   }
+
   function connectTo(id) {
     return new Promise(function (resolve, reject) {
       if (!peer) return reject(new Error("Peer not started"));
       var conn = peer.connect(id, { reliable: true });
-      var timer = setTimeout(function () { reject(new Error("connect timeout")); }, 10000);
+      var timer = setTimeout(function () { reject(new Error("connect timeout")); }, 12000);
       conn.on("open", function () {
         clearTimeout(timer);
         setupConnection(conn);
@@ -116,8 +130,13 @@
       conn.on("error", function (err) { clearTimeout(timer); reject(err); });
     });
   }
+
+  function payloadOf(data) {
+    return typeof data === "string" ? data : JSON.stringify(data);
+  }
+
   function broadcast(data) {
-    var payload = typeof data === "string" ? data : JSON.stringify(data);
+    var payload = payloadOf(data);
     connections.forEach(function (conn) {
       if (conn && conn.open) try { conn.send(payload); } catch (_) {}
     });
@@ -131,11 +150,29 @@
     }
     try { fan(peer); fan(master); } catch (_) {}
   }
+
+  function masterSend(conn, data) {
+    if (!conn) return false;
+    try {
+      if (conn.open) {
+        conn.send(payloadOf(data));
+        return true;
+      }
+      conn.on("open", function () {
+        try { conn.send(payloadOf(data)); } catch (_) {}
+      });
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   function sendTo(id, data) {
     var conn = connections.get(id);
     if (!conn || !conn.open) return false;
-    try { conn.send(typeof data === "string" ? data : JSON.stringify(data)); return true; } catch (_) { return false; }
+    try { conn.send(payloadOf(data)); return true; } catch (_) { return false; }
   }
+
   function destroy() {
     amHost = false;
     releaseMaster();
@@ -144,6 +181,7 @@
     if (peer) try { peer.destroy(); } catch (_) {}
     peer = null;
   }
+
   function isMaster() {
     if (window.WWNRoom && WWNRoom.getState) {
       var st = WWNRoom.getState();
@@ -151,6 +189,7 @@
     }
     return !!amHost;
   }
+
   global.WWNPeer = {
     isMaster: isMaster,
     on: on,
@@ -164,6 +203,7 @@
     connectTo: connectTo,
     broadcast: broadcast,
     sendTo: sendTo,
+    masterSend: masterSend,
     getConnections: function () { return connections; },
     getPersonalId: function () { return peer ? peer.id : null; },
     hasMaster: function () { return !!(master && master.open); },
