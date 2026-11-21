@@ -1,159 +1,94 @@
 (function () {
   "use strict";
-  var supports = null;
-  var lastT = performance.now();
-  var aiHooked = false;
-
-  function ensureSupports() {
-    if (!supports && window.WWNSupportSystem) {
-      try { supports = new WWNSupportSystem(); } catch (e) { console.error(e); }
-    }
-    return supports;
-  }
-
-  function hookAi() {
-    if (aiHooked || !window.WWNAiPilot) return;
-    var Orig = window.WWNAiPilot;
-    if (Orig.__wwnHooked) { aiHooked = true; return; }
-    function Wrapped() {
-      Orig.apply(this, arguments);
-      if (!window.__wwnAiList) window.__wwnAiList = [];
-      // avoid dupes
-      if (window.__wwnAiList.indexOf(this) < 0) window.__wwnAiList.push(this);
-    }
-    Wrapped.prototype = Orig.prototype;
-    Wrapped.__wwnHooked = true;
-    // copy static if any
-    for (var k in Orig) if (Orig.hasOwnProperty(k)) Wrapped[k] = Orig[k];
-    window.WWNAiPilot = Wrapped;
-    aiHooked = true;
-  }
-
-  function enemies() {
-    var list = (window.__wwnAiList || []).concat(window.__wwnRemotes || []);
-    // prune dead refs lightly
-    return list.filter(function (e) { return e && (e.alive !== false || e.hp > 0); });
-  }
-
-  function buildApi(player, combat, api) {
-    api = api || {};
-    var s = ensureSupports();
-    var bridge = {
-      spawnAlly: api.spawnAlly || function () {},
-      spawnDrones: function (n) { if (s) s.spawnDrones(player, n || 6); },
-      spawnTurret: function () { if (s) s.spawnTurret(player); },
-      spawnLeech: function () { if (s) s.spawnLeech(player, enemies()); },
-      spawnShield: function (sec) { if (s) s.spawnShield(player, sec || 6); },
-      spawnTether: function () { if (s) s.spawnTether(player, enemies()); },
-      hiveConvert: function () { if (s) s.hiveConvert(player, enemies()); },
-      spawnRepairBot: function () { if (s) s.spawnRepairBot(player); },
-      spawnKamikaze: function () { if (s) s.spawnKamikaze(player, enemies()); },
-      spawnSatellite: function () { if (s) s.spawnSatellite(player); },
-      spawnMineRing: function () { if (s) s.spawnMineRing(player); },
-      spawnClone: function () { if (s) s.spawnClone(player); },
-      spawnDome: function (sec) { if (s) s.spawnDome(player, sec || 7); },
-      spawnFreezer: function () { if (s) s.spawnFreezer(player); },
-      spawnBattery: function () { if (s) s.spawnBattery(player); },
-      refill: function () {
-        if (window.__wwnLoadout && window.__wwnLoadout.refillAmmo) window.__wwnLoadout.refillAmmo();
-      },
-      globalChaff: function (sec) {
-        player.chaffUntil = performance.now() / 1000 + (sec || 5);
-        if (combat && combat.spawnParticle) combat.spawnParticle(player.x, player.y, "#ffe066", 40, 180);
-      },
-      damageRay: function (x, y, ang, range, dmg, width) {
-        enemies().forEach(function (t) {
-          if (!t || t.isAlly) return;
-          if (t.alive === false && !(t.hp > 0)) return;
-          var x2 = x + Math.cos(ang) * range, y2 = y + Math.sin(ang) * range;
-          var dx = x2 - x, dy = y2 - y, len2 = dx * dx + dy * dy || 1;
-          var tpar = Math.max(0, Math.min(1, ((t.x - x) * dx + (t.y - y) * dy) / len2));
-          var px = x + dx * tpar, py = y + dy * tpar;
-          if (Math.hypot(t.x - px, t.y - py) < (width || 30) + (t.radius || 18))
-            t.hp = Math.max(0, (t.hp || 0) - dmg);
-        });
-      },
-      novaDamage: function (pl, aoe, dmg) {
-        enemies().forEach(function (t) {
-          if (!t || t.isAlly) return;
-          var d = Math.hypot(t.x - pl.x, t.y - pl.y);
-          if (d < aoe) t.hp = Math.max(0, (t.hp || 0) - dmg * (1 - d / aoe * 0.5));
-        });
-      },
-      getEnemies: function () {
-        return enemies().filter(function (e) { return e && e.hp > 0 && !e.isAlly; });
-      },
+  function patchHazards() {
+    if (!window.WWNMapHazards || WWNMapHazards.__hpPatched) return;
+    var Proto = WWNMapHazards.prototype;
+    if (!Proto || !Proto.update) return;
+    var orig = Proto.update;
+    Proto.update = function (dt, player, combat, scoreApi) {
+      var C = window.WWNConfig || {};
+      var maxHp = C.HP_MAX || 320;
+      orig.call(this, dt, player, combat, scoreApi);
+      if (player && player.hp > maxHp) player.hp = maxHp;
+      if (this.pickups && player && player.alive) {
+        for (var i = this.pickups.length - 1; i >= 0; i--) {
+          var pu = this.pickups[i];
+          if (!pu || pu.__got) continue;
+          if (Math.hypot(player.x - pu.x, player.y - pu.y) < 28) {
+            pu.__got = true;
+            if (pu.kind === "hp") player.hp = Math.min(maxHp, player.hp + 48);
+            if (pu.kind === "boost") player.boost = Math.min(100, (player.boost || 0) + 45);
+            if (pu.kind === "ammo" && scoreApi && scoreApi.refillAmmo) scoreApi.refillAmmo();
+            if (pu.kind === "score" && scoreApi && scoreApi.add) scoreApi.add(40, "pickup");
+            this.pickups.splice(i, 1);
+          }
+        }
+      }
     };
-    for (var k in bridge) if (api[k] == null) api[k] = bridge[k];
-    return api;
+    WWNMapHazards.__hpPatched = true;
   }
-
-  function installSecretBridge() {
-    hookAi();
-    if (!window.WWNSecret || WWNSecret.__bridged) return;
-    var orig = WWNSecret.applyEffect.bind(WWNSecret);
-    WWNSecret.applyEffect = function (id, player, combat, api) {
-      window.__wwnPlayer = player;
-      window.__wwnCombat = combat;
-      api = buildApi(player, combat, api || {});
-      var ok = false;
-      try { ok = !!orig(id, player, combat, api); } catch (e) {
-        console.error("secret apply", id, e);
-        // last resort: still try particle
-        if (combat && combat.spawnParticle) combat.spawnParticle(player.x, player.y, "#ff3366", 20, 120);
-        ok = true;
-      }
-      if (ok && combat && combat.spawnParticle) {
-        try { combat.spawnParticle(player.x, player.y, "#00f5ff", 14, 110); } catch (_) {}
-      }
-      return ok;
+  function patchStart() {
+    if (!window.WWNGame || !WWNGame.start || WWNGame.__p2pPatched) return;
+    var origStart = WWNGame.start.bind(WWNGame);
+    WWNGame.start = function (opts) {
+      var r = origStart(opts);
+      setTimeout(function () {
+        var net = window.__wwnNetSync;
+        var player = window.__wwnPlayer;
+        var combat = window.__wwnCombat;
+        if (!net && window.WWNNetSync) {
+          try {
+            net = new WWNNetSync();
+            window.__wwnNetSync = net;
+          } catch (e) {}
+        }
+        if (net && player) {
+          try {
+            net.setLocalId(player.netId);
+            net.bind();
+            net.onCombatEvent = function (ev) {
+              try { if (combat && combat.ingestRemoteEvent) combat.ingestRemoteEvent(ev); } catch (e) {}
+            };
+            if (window.WWNPeer && typeof WWNPeer.isMaster === "function") net.setHost(!!WWNPeer.isMaster());
+            else net.setHost(true);
+          } catch (e) {}
+        }
+        patchHazards();
+      }, 50);
+      return r;
     };
-    WWNSecret.__bridged = true;
+    WWNGame.__p2pPatched = true;
   }
-
-  function tick() {
-    installSecretBridge();
-    var now = performance.now();
-    var dt = Math.min(0.05, (now - lastT) / 1000);
-    lastT = now;
-    var player = window.__wwnPlayer;
-    var combat = window.__wwnCombat;
-    var active = !window.WWNGame || !WWNGame.isActive || WWNGame.isActive();
-    if (player && active) {
-      var s = ensureSupports();
-      if (s) {
-        try { s.update(dt, player, combat, enemies()); } catch (e) {}
+  function frame() {
+    requestAnimationFrame(frame);
+    try {
+      patchStart();
+      patchHazards();
+      if (!window.WWNGame || !WWNGame.isActive || !WWNGame.isActive()) return;
+      var net = window.__wwnNetSync;
+      var player = window.__wwnPlayer;
+      var combat = window.__wwnCombat;
+      var loadout = window.__wwnLoadout;
+      var cam = window.__wwnCamera;
+      if (net && player) {
+        try {
+          if (window.WWNPeer && typeof WWNPeer.isMaster === "function") net.setHost(!!WWNPeer.isMaster());
+          net.tick(1 / 60, player, loadout, combat);
+          net.updateRemotes(1 / 60);
+          window.__wwnRemotes = net.getRemotes();
+        } catch (e) {}
       }
-    }
-    requestAnimationFrame(tick);
+      if (net && cam) {
+        var canvas = document.getElementById("game-canvas");
+        if (canvas) {
+          var ctx = canvas.getContext("2d");
+          var rems = net.getRemotes();
+          for (var i = 0; i < rems.length; i++) {
+            try { rems[i].draw(ctx, cam, player && player.team); } catch (e) {}
+          }
+        }
+      }
+    } catch (e) {}
   }
-  requestAnimationFrame(tick);
-
-  setInterval(function () {
-    installSecretBridge();
-    var player = window.__wwnPlayer;
-    var s = ensureSupports();
-    if (!player || !s) return;
-    if (window.WWNGame && WWNGame.isActive && !WWNGame.isActive()) return;
-    var canvas = document.getElementById("game-canvas");
-    if (!canvas) return;
-    var ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    var cam = window.__wwnCamera || { x: player.x, y: player.y, w: window.innerWidth, h: window.innerHeight };
-    try { s.draw(ctx, cam, player); } catch (e) {}
-  }, 33);
-
-  window.WWNSupportBridge = {
-    get: ensureSupports,
-    apiFor: function (player, combat, aiList, netSync, loadout, spawnAlly) {
-      if (aiList && aiList.length) window.__wwnAiList = aiList;
-      if (netSync && netSync.getRemotes) window.__wwnRemotes = netSync.getRemotes();
-      if (loadout) window.__wwnLoadout = loadout;
-      return buildApi(player, combat, { spawnAlly: spawnAlly || function () {} });
-    },
-  };
-
-  // Early AI hook attempts
-  setInterval(hookAi, 500);
-  hookAi();
+  requestAnimationFrame(frame);
 })();
