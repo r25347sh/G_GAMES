@@ -23,10 +23,7 @@
   }
   function holdOrMove(self, tx, ty, dt, maxSp) {
     var d = Math.hypot(tx - self.x, ty - self.y);
-    if (d < 28) {
-      selfHold(self, dt);
-      return d;
-    }
+    if (d < 28) { selfHold(self, dt); return d; }
     var a = Math.atan2(ty - self.y, tx - self.x);
     turnTo(self, a, dt);
     var sp = Math.min(maxSp || 320, 80 + d * 1.6);
@@ -54,7 +51,6 @@
     p.radius = 3; p.color = self.colorStroke || "#6effc0";
     self.fireCd = rate || 0.3;
   }
-
   function pickFocus(player, list) {
     var now = performance.now() / 1000;
     var cur = window.__wwnAllyFocus;
@@ -84,7 +80,6 @@
     WWNAiPilot.prototype.update = function (dt, player, combat, now, entities) {
       if (this._remoteAlly) return;
       if (!(this.isAlly && player && player.alive)) return oUp.call(this, dt, player, combat, now, entities);
-
       this.ownerId = player.netId;
       this.team = player.team;
       this.group = "ALLY";
@@ -93,6 +88,10 @@
       var focus = pickFocus(player, list);
 
       if (role === "guardian") {
+        this.radiusMul = 1.85;
+        this.radius = Math.max(this.radius || 18, 34);
+        this.hpMax = Math.max(this.hpMax || 200, 320);
+        if ((this.hp || 0) < this.hpMax * 0.5) this.hp = this.hpMax;
         if (focus) {
           var gx = player.x * 0.55 + focus.x * 0.45;
           var gy = player.y * 0.55 + focus.y * 0.45;
@@ -117,9 +116,7 @@
         if (dist(this, player) < 130) {
           player.hp = Math.min(player.hpMax || 560, (player.hp || 0) + 10 * dt);
         }
-        if (focus && dist(player, focus) < 200) {
-          shoot(this, focus, combat, player, dt, 0.5, 0.35);
-        }
+        if (focus && dist(player, focus) < 200) shoot(this, focus, combat, player, dt, 0.5, 0.35);
         return;
       }
 
@@ -141,14 +138,9 @@
           ix += Math.cos(away + 1.2) * 100;
           iy += Math.sin(away + 1.2) * 100;
           if (dist(this, prey) > 180) holdOrMove(this, ix, iy, dt, 400);
-          else {
-            selfHold(this, dt);
-            turnTo(this, Math.atan2(prey.y - this.y, prey.x - this.x), dt);
-          }
+          else { selfHold(this, dt); turnTo(this, Math.atan2(prey.y - this.y, prey.x - this.x), dt); }
           shoot(this, prey, combat, player, dt, 0.2, 0.95);
-        } else {
-          holdOrMove(this, player.x + 80, player.y, dt, 300);
-        }
+        } else holdOrMove(this, player.x + 80, player.y, dt, 300);
         return;
       }
 
@@ -173,21 +165,5 @@
     WWNAiPilot.prototype.__calmSmart = true;
   }
 
-  var _last = performance.now();
-  function frame(now) {
-    requestAnimationFrame(frame);
-    var dt = Math.min(0.05, (now - _last) / 1000); _last = now;
-    var list = window.__wwnAiList; if (!list) return;
-    var tnow = now / 1000;
-    for (var i = 0; i < list.length; i++) {
-      var b = list[i];
-      if (!b || !b.alive || !b._remoteAlly || b._tx == null) continue;
-      var age = Math.min(0.18, Math.max(0, tnow - (b._snapT || tnow)));
-      var k = Math.min(1, 16 * dt);
-      b.x += (b._tx + (b._tvx || 0) * age - b.x) * k;
-      b.y += (b._ty + (b._tvy || 0) * age - b.y) * k;
-    }
-  }
-  requestAnimationFrame(frame);
   setInterval(patchAlly, 200);
 })();
