@@ -170,10 +170,10 @@
     for (var i = 0; i < list.length; i++) {
       if (list[i] && list[i].alive && !list[i].isAlly && !list[i]._remoteAlly) alive++;
     }
-    if (alive < 90 && list.length < 140) {
+    if (alive < 42 && list.length < 55) {
       try {
         var groups = ["G1", "G2", "G3", "G4", "G5", "G6", "G7"];
-        for (var n = 0; n < 7 && alive + n < 90; n++) {
+        for (var n = 0; n < 2 && alive + n < 42; n++) {
           var nb = new WWNAiPilot("cpu-x-" + Date.now() + "-" + list.length + "-" + n, "easy", list.length, groups[n % 7]);
           nb.hp *= 0.8; nb.hpMax *= 0.8;
           var a = Math.random() * Math.PI * 2, rr = 800 + Math.random() * 1600;
@@ -183,5 +183,5 @@
         }
       } catch (e) {}
     }
-  }, 2000);
+  }, 2500);
 })();
