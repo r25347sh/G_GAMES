@@ -1,6 +1,9 @@
 (function () {
   "use strict";
 
+  window.__wwnAllyFocus = window.__wwnAllyFocus || null;
+  window.__wwnAllyFocusT = 0;
+
   var _last = performance.now();
   function smoothFrame(now) {
     requestAnimationFrame(smoothFrame);
@@ -11,120 +14,207 @@
     var tnow = now / 1000;
     for (var i = 0; i < list.length; i++) {
       var b = list[i];
-      if (!b || !b.alive) continue;
-      if (b._remoteAlly && b._tx != null) {
-        var age = Math.min(0.2, Math.max(0, tnow - (b._snapT || tnow)));
-        var ex = b._tx + (b._tvx || 0) * age;
-        var ey = b._ty + (b._tvy || 0) * age;
-        var k = Math.min(1, 16 * dt);
-        b.x += (ex - b.x) * k;
-        b.y += (ey - b.y) * k;
-        var ad = (b._tangle || b.angle || 0) - (b.angle || 0);
-        while (ad > Math.PI) ad -= Math.PI * 2;
-        while (ad < -Math.PI) ad += Math.PI * 2;
-        b.angle = (b.angle || 0) + ad * k;
-      }
+      if (!b || !b.alive || !b._remoteAlly || b._tx == null) continue;
+      var age = Math.min(0.18, Math.max(0, tnow - (b._snapT || tnow)));
+      var ex = b._tx + (b._tvx || 0) * age;
+      var ey = b._ty + (b._tvy || 0) * age;
+      var k = Math.min(1, 18 * dt);
+      b.x += (ex - b.x) * k;
+      b.y += (ey - b.y) * k;
+      var ad = (b._tangle || b.angle || 0) - (b.angle || 0);
+      while (ad > Math.PI) ad -= Math.PI * 2;
+      while (ad < -Math.PI) ad += Math.PI * 2;
+      b.angle = (b.angle || 0) + ad * k;
     }
   }
   requestAnimationFrame(smoothFrame);
 
-  var FORM = {
-    guardian: { dist: 90,  angle: Math.PI * 0.85, engage: 280 },
-    medic:    { dist: 70,  angle: Math.PI,        engage: 200 },
-    striker:  { dist: 140, angle: Math.PI * 0.5,  engage: 520 },
-    phantom:  { dist: 160, angle: -Math.PI * 0.5, engage: 480 },
-    vanguard: { dist: 110, angle: 0.3,            engage: 420 }
-  };
+  function angDiff(a, b) {
+    var d = a - b;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    return d;
+  }
+  function dist(a, b) {
+    return Math.hypot((a.x || 0) - (b.x || 0), (a.y || 0) - (b.y || 0));
+  }
+  function turnToward(self, ang, rate, dt) {
+    var d = angDiff(ang, self.angle || 0);
+    var m = rate * dt;
+    if (Math.abs(d) <= m) self.angle = ang;
+    else self.angle = (self.angle || 0) + Math.sign(d) * m;
+  }
+  function moveToward(self, tx, ty, speed, dt) {
+    var a = Math.atan2(ty - self.y, tx - self.x);
+    turnToward(self, a, 5.5, dt);
+    self.vx = Math.cos(self.angle) * speed;
+    self.vy = Math.sin(self.angle) * speed;
+    self.x += self.vx * dt;
+    self.y += self.vy * dt;
+  }
+  function fireAt(self, tgt, combat, player, dt, rate, dmgMul) {
+    self.fireCd = (self.fireCd || 0) - dt;
+    if (self.fireCd > 0 || !combat || !combat.projectiles || !combat.projectiles.acquire) return;
+    var a = Math.atan2(tgt.y - self.y, tgt.x - self.x);
+    if (Math.abs(angDiff(a, self.angle)) > 0.55) return;
+    if (dist(self, tgt) > (self.attackRange || 750)) return;
+    var p = combat.projectiles.acquire();
+    var w = (window.WWNWeapons && WWNWeapons.vulcan) || { speed: 820, dmg: 5, radius: 3 };
+    p.alive = true; p.type = "bullet";
+    p.x = self.x; p.y = self.y; p.angle = self.angle;
+    p.vx = Math.cos(self.angle) * (w.speed || 820);
+    p.vy = Math.sin(self.angle) * (w.speed || 820);
+    p.life = 0.95; p.dmg = (w.dmg || 5) * (dmgMul || 0.65);
+    p.ownerId = self.ownerId || (player && player.netId);
+    p.team = (player && player.team) || self.team;
+    p.radius = 3; p.aoe = 0; p.color = self.colorStroke || "#6effc0";
+    self.fireCd = rate || 0.28;
+  }
 
-  function patchAllyBehavior() {
-    if (!window.WWNAiPilot || !WWNAiPilot.prototype || WWNAiPilot.prototype.__allyForm) return;
+  function updateSquadFocus(player, entities) {
+    var now = performance.now() / 1000;
+    var cur = window.__wwnAllyFocus;
+    if (cur && cur.alive && (cur.hp || 0) > 0 && dist(player, cur) < 900) {
+      if (now - (window.__wwnAllyFocusT || 0) < 1.4) return cur;
+    }
+    var best = null, score = 1e12;
+    for (var i = 0; i < entities.length; i++) {
+      var e = entities[i];
+      if (!e || !e.alive || e.isAlly || e.group === "ALLY") continue;
+      if (e.team && player.team && e.team === player.team) continue;
+      var d = dist(player, e);
+      if (d > 950) continue;
+      var s = d + (e.hp || 100) * 0.35;
+      if ((e.hp || 100) < 80) s *= 0.7;
+      if (s < score) { score = s; best = e; }
+    }
+    window.__wwnAllyFocus = best;
+    window.__wwnAllyFocusT = now;
+    return best;
+  }
+
+  function patchAllyBrain() {
+    if (!window.WWNAiPilot || !WWNAiPilot.prototype || WWNAiPilot.prototype.__smartAlly) return;
     var oUp = WWNAiPilot.prototype.update;
     if (!oUp) return;
+
     WWNAiPilot.prototype.update = function (dt, player, combat, now, entities) {
       if (this._remoteAlly) return;
-      if (this.isAlly && player && player.alive) {
-        this.ownerId = player.netId;
-        this.leaderId = player.netId;
-        this.team = player.team;
-        this.group = "ALLY";
-        var role = this.allyType || "striker";
-        var f = FORM[role] || FORM.striker;
-        var hx = player.x + Math.cos(player.angle + f.angle) * f.dist;
-        var hy = player.y + Math.sin(player.angle + f.angle) * f.dist;
-        var dx = hx - this.x, dy = hy - this.y;
-        var fd = Math.hypot(dx, dy);
-        var tgt = null, best = f.engage;
-        var list = entities || [];
-        for (var i = 0; i < list.length; i++) {
-          var e = list[i];
-          if (!e || !e.alive || e.isAlly || e.group === "ALLY") continue;
-          if (e.team && e.team === player.team) continue;
-          var d = Math.hypot(e.x - player.x, e.y - player.y);
-          if (d < best) { best = d; tgt = e; }
+      if (!(this.isAlly && player && player.alive)) {
+        return oUp.call(this, dt, player, combat, now, entities);
+      }
+
+      this.ownerId = player.netId;
+      this.team = player.team;
+      this.group = "ALLY";
+      var role = this.allyType || "striker";
+      var list = entities || window.__wwnAiList || [];
+      var focus = updateSquadFocus(player, list);
+
+      var allies = [];
+      for (var i = 0; i < list.length; i++) {
+        if (list[i] && list[i].isAlly && list[i].alive && !list[i]._remoteAlly) allies.push(list[i]);
+      }
+      var idx = Math.max(0, allies.indexOf(this));
+      var nAllies = Math.max(1, allies.length);
+
+      if (role === "medic") {
+        var bx = player.x - Math.cos(player.angle) * 95;
+        var by = player.y - Math.sin(player.angle) * 95;
+        moveToward(this, bx, by, 360, dt);
+        if (dist(this, player) < 140) {
+          player.hp = Math.min(player.hpMax || 560, (player.hp || 0) + 9 * dt);
         }
-        if (role === "medic") {
-          if (player.hp < (player.hpMax || 560) * 0.9 && fd < 120) {
-            player.hp = Math.min(player.hpMax || 560, player.hp + 6 * dt);
-          }
-          tgt = null;
-          this.dmgMul = 0.25;
-        } else if (role === "guardian") {
-          this.dmgMul = Math.min(this.dmgMul || 0.5, 0.55);
-          if (!tgt || best > 220) tgt = null;
-        } else {
-          this.dmgMul = Math.min(this.dmgMul || 0.65, 0.7);
-        }
-        this._target = tgt;
-        if (tgt) {
-          var desired = Math.atan2(tgt.y - this.y, tgt.x - this.x);
-          var ad2 = desired - this.angle;
-          while (ad2 > Math.PI) ad2 -= Math.PI * 2;
-          while (ad2 < -Math.PI) ad2 += Math.PI * 2;
-          this.angle += Math.max(-3.5 * dt, Math.min(3.5 * dt, ad2));
-          var sp = ((window.WWNConfig && WWNConfig.MAX_SPEED) || 420) * 0.95;
-          this.vx = Math.cos(this.angle) * sp;
-          this.vy = Math.sin(this.angle) * sp;
-          this.x += this.vx * dt;
-          this.y += this.vy * dt;
-          this.fireCd = (this.fireCd || 0) - dt;
-          if (this.fireCd <= 0 && combat && combat.projectiles && combat.projectiles.acquire) {
-            var distT = Math.hypot(tgt.x - this.x, tgt.y - this.y);
-            if (distT < (this.attackRange || 700) && Math.abs(ad2) < 0.6) {
-              var p = combat.projectiles.acquire();
-              var w = (window.WWNWeapons && WWNWeapons.vulcan) || { speed: 800, dmg: 5, radius: 3 };
-              p.alive = true; p.type = "bullet";
-              p.x = this.x; p.y = this.y; p.angle = this.angle;
-              p.vx = Math.cos(this.angle) * (w.speed || 800);
-              p.vy = Math.sin(this.angle) * (w.speed || 800);
-              p.life = 0.9; p.dmg = (w.dmg || 5) * (this.dmgMul || 0.6);
-              p.ownerId = this.ownerId || player.netId;
-              p.team = player.team;
-              p.radius = w.radius || 3; p.aoe = 0; p.color = this.colorStroke || "#6effc0";
-              this.fireCd = role === "striker" ? 0.22 : 0.35;
-            }
-          }
-          return;
-        }
-        if (fd > 18) {
-          var desired2 = Math.atan2(dy, dx);
-          var ad3 = desired2 - this.angle;
-          while (ad3 > Math.PI) ad3 -= Math.PI * 2;
-          while (ad3 < -Math.PI) ad3 += Math.PI * 2;
-          this.angle += Math.max(-4 * dt, Math.min(4 * dt, ad3));
-          var sp2 = Math.min(420, 180 + fd * 1.8);
-          this.vx = Math.cos(this.angle) * sp2;
-          this.vy = Math.sin(this.angle) * sp2;
-          this.x += this.vx * dt;
-          this.y += this.vy * dt;
-        } else {
-          this.vx *= 0.85; this.vy *= 0.85;
-          this.angle = player.angle;
+        if (focus && dist(player, focus) < 220) {
+          turnToward(this, Math.atan2(focus.y - this.y, focus.x - this.x), 4, dt);
+          fireAt(this, focus, combat, player, dt, 0.55, 0.35);
         }
         return;
       }
-      return oUp.call(this, dt, player, combat, now, entities);
+
+      if (role === "guardian") {
+        if (focus) {
+          var gx = player.x + (focus.x - player.x) * 0.28;
+          var gy = player.y + (focus.y - player.y) * 0.28;
+          moveToward(this, gx, gy, 400, dt);
+          turnToward(this, Math.atan2(focus.y - this.y, focus.x - this.x), 5, dt);
+          fireAt(this, focus, combat, player, dt, 0.32, 0.55);
+        } else {
+          var hx = player.x + Math.cos(player.angle + 1.2) * 85;
+          var hy = player.y + Math.sin(player.angle + 1.2) * 85;
+          moveToward(this, hx, hy, 340, dt);
+        }
+        return;
+      }
+
+      if (role === "hivemind") {
+        var prey = focus;
+        if (!prey) {
+          var bestD = 1000;
+          for (var j = 0; j < list.length; j++) {
+            var e = list[j];
+            if (!e || !e.alive || e.isAlly || e.group === "ALLY") continue;
+            var dd = dist(this, e);
+            if (dd < bestD) { bestD = dd; prey = e; }
+          }
+        }
+        if (prey) {
+          var ix = prey.x + (prey.vx || 0) * 0.35;
+          var iy = prey.y + (prey.vy || 0) * 0.35;
+          var away = Math.atan2(prey.y - player.y, prey.x - player.x);
+          ix += Math.cos(away + Math.PI * 0.55) * 90;
+          iy += Math.sin(away + Math.PI * 0.55) * 90;
+          var dP = dist(this, prey);
+          if (dP > 160) moveToward(this, ix, iy, 460, dt);
+          else {
+            var ca = Math.atan2(this.y - prey.y, this.x - prey.x) + 1.7 * dt;
+            var cx = prey.x + Math.cos(ca) * 140;
+            var cy = prey.y + Math.sin(ca) * 140;
+            moveToward(this, cx, cy, 420, dt);
+          }
+          turnToward(this, Math.atan2(prey.y - this.y, prey.x - this.x), 6, dt);
+          fireAt(this, prey, combat, player, dt, 0.18, 0.9);
+        } else {
+          moveToward(this, player.x + 100, player.y, 380, dt);
+        }
+        return;
+      }
+
+      if (!focus) {
+        var slotAng = player.angle + (idx / nAllies) * Math.PI * 1.6 - 0.8;
+        var slotR = role === "vanguard" ? 100 : role === "phantom" ? 150 : 120;
+        moveToward(this,
+          player.x + Math.cos(slotAng) * slotR,
+          player.y + Math.sin(slotAng) * slotR,
+          360, dt);
+        return;
+      }
+
+      var base = Math.atan2(focus.y - player.y, focus.x - player.x);
+      var spread = (idx - (nAllies - 1) / 2) * 0.55;
+      if (role === "phantom") spread += 0.9;
+      if (role === "vanguard") spread *= 0.4;
+      if (role === "striker") spread -= 0.25;
+      var attackAng = base + spread;
+      var preferDist = role === "phantom" ? 220 : role === "vanguard" ? 130 : 170;
+      if ((focus.hp || 100) < 60) preferDist = 110;
+      var ax = focus.x - Math.cos(attackAng) * preferDist;
+      var ay = focus.y - Math.sin(attackAng) * preferDist;
+
+      var headOn = Math.abs(angDiff(Math.atan2(focus.y - this.y, focus.x - this.x), this.angle)) < 0.3;
+      if (headOn && dist(this, focus) < 200 && role === "phantom") {
+        ax += Math.cos(attackAng + Math.PI / 2) * 120;
+        ay += Math.sin(attackAng + Math.PI / 2) * 120;
+      }
+
+      moveToward(this, ax, ay, role === "striker" ? 450 : 410, dt);
+      turnToward(this, Math.atan2(focus.y - this.y, focus.x - this.x), 5.5, dt);
+      var rate = role === "striker" ? 0.2 : role === "vanguard" ? 0.24 : 0.3;
+      var dmg = role === "striker" ? 0.75 : 0.6;
+      fireAt(this, focus, combat, player, dt, rate, dmg);
     };
-    WWNAiPilot.prototype.__allyForm = true;
+
+    WWNAiPilot.prototype.__smartAlly = true;
   }
 
   function tickWorld() {
@@ -158,11 +248,8 @@
             b.x = player.x + Math.cos(a) * r;
             b.y = player.y + Math.sin(a) * r;
           }
-          b.vx = 0; b.vy = 0;
         }
-      } else {
-        aliveEnemy++;
-      }
+      } else aliveEnemy++;
     }
     if (aliveEnemy < 48 && list.length < 90 && window.WWNAiPilot && player) {
       try {
@@ -178,7 +265,7 @@
   }
 
   setInterval(function () {
-    patchAllyBehavior();
+    patchAllyBrain();
     tickWorld();
-  }, 250);
+  }, 200);
 })();
