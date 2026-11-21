@@ -30,9 +30,18 @@
 
   function hurt(t, dmg, ownerId) {
     if (!t || !t.alive || dmg <= 0) return;
+    var wasAlive = t.alive && (t.hp || 0) > 0;
     t.hp = Math.max(0, (t.hp || 0) - dmg);
     t.lastHitBy = ownerId;
-    if (t.hp <= 0) t.alive = false;
+    if (t.hp <= 0) {
+      t.alive = false;
+      if (wasAlive && !t.isAlly && t.group !== "ALLY") {
+        try {
+          if (window.__wwnScore && window.__wwnScore.onKill) window.__wwnScore.onKill();
+          else if (window.__wwnScore && window.__wwnScore.add) window.__wwnScore.add(100, "kill");
+        } catch (e) {}
+      }
+    }
     try {
       if (window.__wwnNetSync && window.__wwnNetSync.queueDamage && t.netId) {
         var me = getPlayer();
@@ -51,7 +60,7 @@
       if (isFriendly(src, t)) continue;
       var d = Math.hypot((t.x || 0) - x, (t.y || 0) - y);
       if (d > radius + (t.radius || 18)) continue;
-      var fall = 1 - (d / (radius + 1)) * 0.4;
+      var fall = 1 - (d / (radius + 1)) * 0.35;
       hurt(t, dmg * fall, ownerId);
       if (extra) extra(t);
     }
@@ -81,17 +90,15 @@
           });
         }
         e.r = Math.min(e.maxR || 320, (e.r || 0) + (e.maxR || 320) * 4 * dt);
-        blastAoe(e.x, e.y, e.r || 0, (e.dmg || 22) * dt * 0.4, e.ownerId, e.team, function (t) {
-          t.vx = (t.vx || 0) * 0.9; t.vy = (t.vy || 0) * 0.9;
-        });
+        blastAoe(e.x, e.y, e.r || 0, (e.dmg || 22) * dt * 0.4, e.ownerId, e.team);
       } else if (e.type === "omni") {
-        e.maxR = e.maxR || 780;
-        e.r = Math.min(e.maxR, (e.r || 30) + e.maxR * 2.2 * dt);
+        e.maxR = e.maxR || 4500;
+        e.r = Math.min(e.maxR, (e.r || 40) + e.maxR * 1.35 * dt);
         if (!e._blasted) {
           e._blasted = true;
-          blastAoe(e.x, e.y, 220, (e.dmg || 40) * 0.7, e.ownerId, e.team);
+          blastAoe(e.x, e.y, 400, (e.dmg || 36) * 0.8, e.ownerId, e.team);
         }
-        blastAoe(e.x, e.y, e.r, (e.dmg || 40) * dt * 1.2, e.ownerId, e.team);
+        blastAoe(e.x, e.y, e.r, (e.dmg || 36) * dt * 0.9, e.ownerId, e.team);
       } else if (e.type === "worldshift") {
         for (var k = 0; k < targets.length; k++) {
           var u = targets[k];
@@ -100,7 +107,6 @@
           if (u === getPlayer() || (getPlayer() && u.netId === getPlayer().netId)) continue;
           u.vx = (u.vx || 0) * 0.7;
           u.vy = (u.vy || 0) * 0.7;
-          u.speedMul = 0.4;
           var dx = e.x - u.x, dy = e.y - u.y;
           var dd = Math.hypot(dx, dy) || 1;
           u.vx += (dx / dd) * 50 * dt;
@@ -133,12 +139,6 @@
             ct.vx *= 0.12; ct.vy *= 0.12;
             ct.fireCd = Math.max(ct.fireCd || 0, 0.5);
           }
-        }
-      } else if (e.type === "meteor") {
-        e.r = (e.r || 0) + 400 * dt;
-        if (e.r > 20 && !e._hit) {
-          e._hit = true;
-          blastAoe(e.x, e.y, e.aoe || 180, e.dmg || 80, e.ownerId, e.team);
         }
       }
 
@@ -180,11 +180,8 @@
             e.dmg = (w && w.dmg) || 22;
             e.duration = (w && w.duration) || 3;
             e.maxR = (w && w.aoe) || 320;
-            e.life = 0.7;
-            e.r = 0;
-            e._blasted = false;
-            found = true;
-            break;
+            e.life = 0.7; e.r = 0; e._blasted = false;
+            found = true; break;
           }
         }
         if (!found) {
@@ -197,26 +194,16 @@
           });
         }
         try {
-          if (window.WWNPeer) {
-            window.WWNPeer.broadcast({
-              t: "fx", kind: "empRing",
-              x: player.x, y: player.y,
-              maxR: (w && w.aoe) || 320, dmg: (w && w.dmg) || 22,
-              duration: (w && w.duration) || 3,
-              ownerId: player.netId, team: player.team, life: 0.7
-            });
-          }
+          if (window.WWNPeer) window.WWNPeer.broadcast({
+            t: "fx", kind: "empRing", x: player.x, y: player.y,
+            maxR: (w && w.aoe) || 320, dmg: (w && w.dmg) || 22,
+            duration: (w && w.duration) || 3, ownerId: player.netId, team: player.team, life: 0.7
+          });
         } catch (err) {}
       }
       return r;
     };
     WWNCombat.prototype.__emp2 = true;
-  }
-
-  function patchPlasma() {
-    if (!window.WWNWeapons || !WWNWeapons.plasma) return;
-    WWNWeapons.plasma.dmg = Math.max(WWNWeapons.plasma.dmg || 0, 44);
-    WWNWeapons.plasma.aoe = Math.max(WWNWeapons.plasma.aoe || 0, 95);
   }
 
   function patchSync() {
@@ -233,14 +220,13 @@
       combat.effects.push({
         type: msg.kind || "omni",
         x: msg.x, y: msg.y,
-        r: msg.r || 0, maxR: msg.maxR || 500,
+        r: msg.r || 0, maxR: msg.maxR || 4500,
         life: msg.life || 1,
         dmg: msg.dmg || 20,
         duration: msg.duration || 2,
         ownerId: msg.ownerId, team: msg.team || "NONE",
         angle: msg.angle, range: msg.range, width: msg.width,
-        aoe: msg.aoe, color: msg.color,
-        _blasted: false, _hit: false
+        color: msg.color, _blasted: false
       });
     });
   }
@@ -258,7 +244,6 @@
   setInterval(function () {
     patchUpdate();
     patchEmp();
-    patchPlasma();
     patchSync();
   }, 250);
 })();
