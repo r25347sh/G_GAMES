@@ -12,6 +12,12 @@
     if (p.team && t.team && p.team === t.team && p.team !== "NONE") return true;
     return false;
   }
+  function queueDmg(t, dmg, ownerId) {
+    try {
+      if (window.__wwnNetSync && window.__wwnNetSync.queueDamage && t && t.netId)
+        window.__wwnNetSync.queueDamage(t.netId, dmg, ownerId);
+    } catch (e) {}
+  }
   function explodeAt(combat, x, y, aoe, dmg, ownerId, team, targets) {
     combat.spawnParticle(x, y, "#ff6b6b", 18, 140);
     (targets || []).forEach(function (t) {
@@ -21,8 +27,10 @@
       var d = Math.hypot(t.x - x, t.y - y);
       if (d <= aoe + (t.radius || 18)) {
         var falloff = 1 - (d / (aoe + 20)) * 0.5;
-        t.hp = Math.max(0, (t.hp || 0) - dmg * falloff);
+        var dealt = dmg * falloff;
+        t.hp = Math.max(0, (t.hp || 0) - dealt);
         t.lastHitBy = ownerId;
+        queueDmg(t, dealt, ownerId);
       }
     });
   }
@@ -54,30 +62,6 @@
       }
     }
     return locked;
-  }
-  function updateSpecialEffects(combat, dt, localPlayer, remotes) {
-    if (!combat || !combat.effects) return;
-    var targets = [localPlayer].concat(remotes || []).filter(function (t) { return t && t.alive; });
-    for (var i = combat.effects.length - 1; i >= 0; i--) {
-      var e = combat.effects[i];
-      if (!e) { combat.effects.splice(i, 1); continue; }
-      e.life = (e.life || 0) - dt;
-      if (e.type === "blackhole") {
-        e.r = Math.min(e.maxR || 160, (e.r || 0) + 80 * dt);
-        targets.forEach(function (t) {
-          if (!t || t.netId === e.ownerId) return;
-          if (e.team && t.team && e.team === t.team) return;
-          var dx = e.x - t.x, dy = e.y - t.y, d = Math.hypot(dx, dy) || 1;
-          if (d < e.r + 40) {
-            var pull = 220 * dt;
-            t.vx = (t.vx || 0) + (dx / d) * pull;
-            t.vy = (t.vy || 0) + (dy / d) * pull;
-            if (e.dmg && d < e.r * 0.4) t.hp = Math.max(0, (t.hp || 0) - e.dmg * dt);
-          }
-        });
-      }
-      if (e.life <= 0) combat.effects.splice(i, 1);
-    }
   }
   function updateCombat(combat, dt, localPlayer, remotes, loadout, now) {
     if (!combat) return;
@@ -131,6 +115,7 @@
         if (Math.hypot(t.x - p.x, t.y - p.y) <= rad) {
           t.hp = Math.max(0, (t.hp || 0) - p.dmg);
           t.lastHitBy = p.ownerId;
+          queueDmg(t, p.dmg, p.ownerId);
           if (p.aoe > 0 && p.type !== "missile") explodeAt(combat, p.x, p.y, p.aoe, p.dmg * 0.5, p.ownerId, p.team, targets);
           p.alive = false;
           combat.spawnParticle(p.x, p.y, p.color || "#fff", 10, 80);
@@ -178,7 +163,6 @@
       });
       combat.particles.releaseDead(function (p) { return !p.alive; });
     }
-    updateSpecialEffects(combat, dt, localPlayer, remotes);
   }
   global.WWNCombatUpdate = { update: updateCombat, explodeAt: explodeAt, friendly: friendly };
 })(typeof window !== "undefined" ? window : globalThis);
