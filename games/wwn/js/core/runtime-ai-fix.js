@@ -93,10 +93,8 @@
         this.hpMax = Math.max(this.hpMax || 200, 320);
         if ((this.hp || 0) < this.hpMax * 0.5) this.hp = this.hpMax;
         if (focus) {
-          var gx = player.x * 0.55 + focus.x * 0.45;
-          var gy = player.y * 0.55 + focus.y * 0.45;
-          gx = player.x + (gx - player.x) * 0.7;
-          gy = player.y + (gy - player.y) * 0.7;
+          var gx = player.x + (focus.x - player.x) * 0.32;
+          var gy = player.y + (focus.y - player.y) * 0.32;
           holdOrMove(this, gx, gy, dt, 280);
           shoot(this, focus, combat, player, dt, 0.28, 0.65);
         } else {
@@ -107,7 +105,6 @@
         }
         return;
       }
-
       if (role === "medic") {
         holdOrMove(this,
           player.x - Math.cos(player.angle) * 90,
@@ -119,7 +116,6 @@
         if (focus && dist(player, focus) < 200) shoot(this, focus, combat, player, dt, 0.5, 0.35);
         return;
       }
-
       if (role === "hivemind") {
         var prey = focus;
         if (!prey) {
@@ -143,7 +139,6 @@
         } else holdOrMove(this, player.x + 80, player.y, dt, 300);
         return;
       }
-
       if (!focus) {
         var ang = player.angle + (role === "phantom" ? -1.1 : role === "vanguard" ? 0.2 : 0.9);
         holdOrMove(this, player.x + Math.cos(ang) * 110, player.y + Math.sin(ang) * 110, dt, 260);
@@ -166,4 +161,27 @@
   }
 
   setInterval(patchAlly, 200);
+
+  setInterval(function () {
+    var list = window.__wwnAiList;
+    var player = window.__wwnPlayer;
+    if (!list || !player || !window.WWNAiPilot) return;
+    var alive = 0;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] && list[i].alive && !list[i].isAlly && !list[i]._remoteAlly) alive++;
+    }
+    if (alive < 90 && list.length < 140) {
+      try {
+        var groups = ["G1", "G2", "G3", "G4", "G5", "G6", "G7"];
+        for (var n = 0; n < 7 && alive + n < 90; n++) {
+          var nb = new WWNAiPilot("cpu-x-" + Date.now() + "-" + list.length + "-" + n, "easy", list.length, groups[n % 7]);
+          nb.hp *= 0.8; nb.hpMax *= 0.8;
+          var a = Math.random() * Math.PI * 2, rr = 800 + Math.random() * 1600;
+          nb.x = player.x + Math.cos(a) * rr;
+          nb.y = player.y + Math.sin(a) * rr;
+          list.push(nb);
+        }
+      } catch (e) {}
+    }
+  }, 2000);
 })();
