@@ -3,9 +3,8 @@
   var canvas, ctx, loop, player, camera, world, combat, loadout, netSync, minimapCanvas;
   var mapHazards, scoreBoard, supports;
   var active = false;
-  var fireMainCd = 0, fireSubCd = 0, fireGadgetCd = 0, secretCd = 0, cyberTint = 0, secretIdx = 0;
+  var fireMainCd = 0, fireSubCd = 0, fireGadgetCd = 0, secretCd = 0, secretIdx = 0;
   var aiList = [];
-  var gameMode = "solo";
   var els = {};
   function $(id) { return document.getElementById(id); }
   function initDom() {
@@ -17,7 +16,7 @@
     els.hudSpeed = $("hud-speed"); els.hudCoord = $("hud-coord"); els.hudScore = $("hud-score");
     els.weaponMain = $("weapon-main"); els.weaponSub = $("weapon-sub"); els.weaponGadget = $("weapon-gadget");
     els.secretSlot = $("secret-slot"); els.killFeed = $("kill-feed");
-    els.respawnOverlay = $("respawn-overlay"); els.borderWarn = $("border-warn");
+    els.respawnOverlay = $("respawn-overlay");
     els.hudFps = $("hud-fps"); els.btnExit = $("btn-exit-game");
     minimapCanvas = $("minimap-canvas");
     if (els.btnExit) els.btnExit.onclick = function () { stopGame(); };
@@ -36,11 +35,12 @@
   }
   function spawnCpuBots(count, diff, over) {
     var groups = ["G1", "G2", "G3", "G4", "G5", "G6", "G7"];
-    var n = Math.max(1, Math.min(60, count || 5));
+    var n = Math.max(1, Math.min(70, count || 5));
     for (var i = 0; i < n; i++) {
       try {
         var bot = new WWNAiPilot("cpu-" + (i + 1), diff || "normal", i, groups[i % groups.length]);
-        if (over) { bot.openWeak = true; bot.hp *= 0.55; bot.hpMax *= 0.55; }
+        if (over) { bot.openWeak = true; bot.hp *= 0.7; bot.hpMax *= 0.7; }
+        else { bot.hp *= 1.25; bot.hpMax *= 1.25; }
         aiList.push(bot);
       } catch (e) {}
     }
@@ -82,8 +82,8 @@
   function startGame(options) {
     options = options || {};
     if (!initDom()) { console.error("[WWN] DOM missing"); return; }
-    active = true; gameMode = options.mode || "solo"; aiList = [];
-    fireMainCd = fireSubCd = fireGadgetCd = secretCd = 0; cyberTint = 0; secretIdx = 0;
+    active = true; aiList = [];
+    fireMainCd = fireSubCd = fireGadgetCd = secretCd = 0; secretIdx = 0;
     if (els.lobbyWrap) els.lobbyWrap.classList.add("hidden");
     if (els.gameLayer) els.gameLayer.classList.remove("hidden");
     document.body.classList.add("in-game");
@@ -95,7 +95,7 @@
       combat = new WWNCombat();
       loadout = new WWNWeaponLoadout();
       try {
-        var seedStr = (options.roomName || options.netId || "solo") + "|" + (options.mode || "");
+        var seedStr = (options.roomName || "solo") + "|" + (options.mode || "");
         var seed = 0;
         for (var si = 0; si < seedStr.length; si++) seed = (seed * 31 + seedStr.charCodeAt(si)) >>> 0;
         window.__wwnMapSeed = seed || 1;
@@ -106,6 +106,7 @@
       netSync = new WWNNetSync();
       player.alive = true;
       player.hp = WWNConfig.HP_MAX;
+      player.hpMax = WWNConfig.HP_MAX;
       player.boost = WWNConfig.BOOST_MAX;
       player.netId = options.netId || ("local-" + Math.random().toString(36).slice(2, 8));
       if (options.mode === "online" || options.mode === "open" || options.mode === "1v1" || options.mode === "team") {
@@ -130,12 +131,12 @@
       WWNInput.bind(canvas);
       if (options.mode === "cpu" || options.cpuCount) {
         var diff = options.diff || options.difficulty || "normal";
-        if (options.over || options.mode === "over") spawnCpuBots(Math.max(40, Math.min(60, options.cpuCount || 48)), diff, true);
-        else spawnCpuBots(options.cpuCount || 5, diff, false);
+        if (options.over || options.mode === "over") spawnCpuBots(Math.max(40, Math.min(70, options.cpuCount || 48)), diff, true);
+        else spawnCpuBots(options.cpuCount || 16, diff, false);
       } else if (options.mode === "solo") {
-        spawnCpuBots(7, "easy", false);
+        spawnCpuBots(18, "easy", false);
       } else if (options.mode === "online" || options.mode === "open") {
-        spawnCpuBots(12, "easy", true);
+        spawnCpuBots(28, "easy", true);
       }
       loop = new WWNGameLoop(update, render);
       loop.start();
@@ -143,6 +144,11 @@
       window.__wwnPlayer = player; window.__wwnCombat = combat; window.__wwnAiList = aiList;
       window.__wwnNetSync = netSync; window.__wwnLoadout = loadout; window.__wwnCamera = camera;
       console.log("[WWN] start team=" + player.team + " bots=" + aiList.length);
+      try {
+        if (netSync && (netSync.isHost || options.isOwner) && window.WWNPeer) {
+          WWNPeer.broadcast({ t: "mapseed", seed: window.__wwnMapSeed || 1 });
+        }
+      } catch (e) {}
     } catch (e) {
       console.error("[WWN] start failed", e);
       stopGame();
@@ -202,9 +208,11 @@
               spawnFreezer: function () { if (supports && supports.spawnFreezer) supports.spawnFreezer(player); },
               novaDamage: function (pl, r, d) {
                 aiList.concat(netSync ? netSync.getRemotes() : []).forEach(function (t) {
-                  if (!t || !t.alive) return;
-                  if (t.team === pl.team) return;
-                  if (Math.hypot(t.x - pl.x, t.y - pl.y) < r) t.hp = Math.max(0, t.hp - d);
+                  if (!t || !t.alive || t.team === pl.team) return;
+                  if (Math.hypot(t.x - pl.x, t.y - pl.y) < r) {
+                    t.hp = Math.max(0, t.hp - d);
+                    try { if (netSync && netSync.queueDamage && t.netId) netSync.queueDamage(t.netId, d, pl.netId); } catch (e) {}
+                  }
                 });
               },
               damageRay: function (x, y, ang, range, width, dmg) {
@@ -214,7 +222,10 @@
                   var proj = dx * Math.cos(ang) + dy * Math.sin(ang);
                   if (proj < 0 || proj > range) return;
                   var perp = Math.abs(-dx * Math.sin(ang) + dy * Math.cos(ang));
-                  if (perp < width + (t.radius || 18)) t.hp = Math.max(0, t.hp - dmg);
+                  if (perp < width + (t.radius || 18)) {
+                    t.hp = Math.max(0, t.hp - dmg);
+                    try { if (netSync && netSync.queueDamage && t.netId) netSync.queueDamage(t.netId, dmg, player.netId); } catch (e) {}
+                  }
                 });
               },
               refill: function () { if (loadout && loadout.refillAmmo) loadout.refillAmmo(); }
@@ -239,11 +250,17 @@
       }
       var allEntities = aiList.concat(netSync ? netSync.getRemotes() : []);
       for (var i = 0; i < aiList.length; i++) {
-        try { aiList[i].update(dt, player, combat, now, allEntities); } catch (e) {}
+        try {
+          if (aiList[i]._remoteAlly) {
+            if ((aiList[i].hp || 0) <= 0) aiList[i].alive = false;
+          } else {
+            aiList[i].update(dt, player, combat, now, allEntities);
+          }
+        } catch (e) {}
       }
       for (var ri = 0; ri < aiList.length; ri++) {
         var bot = aiList[ri];
-        if (!bot) continue;
+        if (!bot || bot._remoteAlly) continue;
         if (bot.alive && (bot.hp || 0) <= 0) {
           bot.alive = false;
           bot.respawnTimer = (WWNConfig.RESPAWN_SEC || 3.2) * (bot.isAlly ? 0.55 : 1.1);
@@ -294,9 +311,10 @@
   }
   function updateHud() {
     if (!player || !loadout) return;
-    var hpPct = Math.max(0, player.hp / WWNConfig.HP_MAX);
+    var maxHp = player.hpMax || WWNConfig.HP_MAX;
+    var hpPct = Math.max(0, player.hp / maxHp);
     if (els.hudHp) els.hudHp.style.width = (hpPct * 100) + "%";
-    if (els.hudHpText) els.hudHpText.textContent = Math.round(player.hp) + " / " + WWNConfig.HP_MAX;
+    if (els.hudHpText) els.hudHpText.textContent = Math.round(player.hp) + " / " + maxHp;
     if (els.hudBoost) els.hudBoost.style.width = (Math.max(0, player.boost / WWNConfig.BOOST_MAX) * 100) + "%";
     if (els.hudHeat) els.hudHeat.style.width = Math.min(100, (loadout.heat || 0)) + "%";
     if (els.hudEnergy) els.hudEnergy.style.width = Math.min(100, (loadout.energy || 0)) + "%";
