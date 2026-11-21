@@ -28,9 +28,7 @@
     omnistorm: { name: "オムニストーム", slot: "secret" },
     worldshift: { name: "ワールドシフト", slot: "secret" },
     godray: { name: "ゴッドレイ360", slot: "secret" },
-    timestop: { name: "タイムストップ", slot: "secret" },
-    meteorrain: { name: "メテオレイン", slot: "secret" },
-    voidnova: { name: "ヴォイドノヴァ", slot: "secret" }
+    timestop: { name: "タイムストップ", slot: "secret" }
   };
   var PHRASES = {
     orbitallaser: "orbitallaser", blackhole: "blackhole", cyberpulse: "cyber",
@@ -42,7 +40,7 @@
     kagebunshin: "kagebunshin", randomgimmick: "randomgimmick",
     novasurge: "nova", overdrive: "overdrive", rootaccess: "terminal",
     omnistorm: "omnistorm", worldshift: "worldshift", godray: "godray",
-    timestop: "timestop", meteorrain: "meteorrain", voidnova: "voidnova"
+    timestop: "timestop"
   };
   var unlocked = {}, buffer = "", lastKey = 0;
   try { var saved = localStorage.getItem("wwn_secrets"); if (saved) unlocked = JSON.parse(saved) || {}; } catch (e) {}
@@ -135,11 +133,11 @@
     if (effectId === "overdrive") { player.boost = (global.WWNConfig && WWNConfig.BOOST_MAX) || 100; if (api.refill) api.refill(); boom("#ff8a65", 20); return true; }
     if (effectId === "omnistorm") {
       var omni = {
-        type: "omni", x: player.x, y: player.y, r: 40, maxR: 780, life: 1.4,
-        dmg: 40, ownerId: player.netId || "local", team: player.team || "NONE", color: "#ff1744", _blasted: false
+        type: "omni", x: player.x, y: player.y, r: 60, maxR: 4500, life: 2.2,
+        dmg: 36, ownerId: player.netId || "local", team: player.team || "NONE", color: "#ff1744", _blasted: false
       };
       if (combat && combat.effects) combat.effects.push(omni);
-      broadcastFx({ kind: "omni", x: omni.x, y: omni.y, maxR: omni.maxR, life: omni.life, dmg: omni.dmg, ownerId: omni.ownerId, team: omni.team });
+      broadcastFx({ kind: "omni", x: omni.x, y: omni.y, maxR: 4500, life: omni.life, dmg: omni.dmg, ownerId: omni.ownerId, team: omni.team });
       boom("#ff1744", 50); return true;
     }
     if (effectId === "worldshift") {
@@ -173,31 +171,6 @@
       if (combat && combat.effects) combat.effects.push(ch);
       broadcastFx({ kind: "chrono", x: ch.x, y: ch.y, r: ch.r, life: ch.life, ownerId: ch.ownerId, team: ch.team });
       boom("#80d8ff", 36); return true;
-    }
-    if (effectId === "meteorrain") {
-      if (combat && combat.effects) {
-        for (var mi = 0; mi < 8; mi++) {
-          var mx = player.x + (Math.random() - 0.5) * 900;
-          var my = player.y + (Math.random() - 0.5) * 900;
-          combat.effects.push({
-            type: "meteor", x: mx, y: my, r: 0, aoe: 160, life: 0.8 + Math.random() * 0.4,
-            dmg: 70, ownerId: player.netId || "local", team: player.team || "NONE",
-            color: "#ff6e40", _hit: false
-          });
-        }
-      }
-      broadcastFx({ kind: "omni", x: player.x, y: player.y, maxR: 400, life: 0.8, dmg: 25, ownerId: player.netId, team: player.team });
-      boom("#ff6e40", 50); return true;
-    }
-    if (effectId === "voidnova") {
-      var vn = {
-        type: "omni", x: player.x, y: player.y, r: 20, maxR: 520, life: 1.0,
-        dmg: 55, ownerId: player.netId || "local", team: player.team || "NONE",
-        color: "#7c4dff", _blasted: false
-      };
-      if (combat && combat.effects) combat.effects.push(vn);
-      broadcastFx({ kind: "omni", x: vn.x, y: vn.y, maxR: vn.maxR, life: vn.life, dmg: vn.dmg, ownerId: vn.ownerId, team: vn.team, color: "#7c4dff" });
-      boom("#7c4dff", 55); return true;
     }
     if (effectId === "terminal") { if (global.WWNTerminal && WWNTerminal.open) WWNTerminal.open(); return true; }
     boom("#fff", 12); return true;
