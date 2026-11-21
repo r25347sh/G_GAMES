@@ -39,7 +39,23 @@
   var unlocked = {}, buffer = "", lastKey = 0;
   try { var saved = localStorage.getItem("wwn_secrets"); if (saved) unlocked = JSON.parse(saved) || {}; } catch (e) {}
   function save() { try { localStorage.setItem("wwn_secrets", JSON.stringify(unlocked)); } catch (e) {} }
-  function unlock(id) { if (!EFFECT_META[id]) return false; unlocked[id] = true; save(); return true; }
+  function unlock(id) {
+    if (!EFFECT_META[id]) return false;
+    var first = !unlocked[id];
+    unlocked[id] = true; save();
+    if (first) {
+      try {
+        var t = document.getElementById("toast");
+        if (t) {
+          t.textContent = "特殊解除: " + (EFFECT_META[id].name || id);
+          t.classList.add("show");
+          setTimeout(function () { t.classList.remove("show"); }, 2200);
+        }
+      } catch (e) {}
+      try { window.dispatchEvent(new CustomEvent("wwn-secret-unlock", { detail: id })); } catch (e) {}
+    }
+    return true;
+  }
   function getUnlockedList() { return Object.keys(unlocked).filter(function (k) { return unlocked[k] && EFFECT_META[k]; }); }
   function getMeta(id) { return EFFECT_META[id] || { name: id, slot: "secret" }; }
   function tryResolve() {
@@ -56,18 +72,13 @@
     if (!ch || ch.length !== 1) return;
     var now = performance.now(); if (now - lastKey > 3500) buffer = "";
     lastKey = now; buffer = (buffer + ch.toLowerCase()).slice(-28);
-    try {
-      var lower = buffer.toLowerCase();
-      var keys = Object.keys(PHRASES).sort(function (a, b) { return b.length - a.length; });
-      for (var i = 0; i < keys.length; i++) {
-        var phrase = keys[i];
-        if (lower.slice(-phrase.length) === phrase) {
-          buffer = ""; unlock(PHRASES[phrase]);
-          try { window.dispatchEvent(new CustomEvent("wwn-secret-unlock", { detail: PHRASES[phrase] })); } catch (e) {}
-          break;
-        }
+    var lower = buffer.toLowerCase();
+    var keys = Object.keys(PHRASES).sort(function (a, b) { return b.length - a.length; });
+    for (var i = 0; i < keys.length; i++) {
+      if (lower.slice(-keys[i].length) === keys[i]) {
+        buffer = ""; unlock(PHRASES[keys[i]]); break;
       }
-    } catch (e) {}
+    }
   }
   function applyEffect(effectId, player, combat, api) {
     api = api || {};
