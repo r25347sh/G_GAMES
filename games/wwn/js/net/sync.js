@@ -3,24 +3,25 @@
   function NetSync() {
     this.acc = 0; this.remotes = new Map(); this.localId = null;
     this.onCombatEvent = null; this._bound = false; this._dataHandler = null;
+    this._aiAcc = 0; this.isHost = false;
   }
   NetSync.prototype.setLocalId = function (id) { this.localId = id || null; };
+  NetSync.prototype.setHost = function (v) { this.isHost = !!v; };
   NetSync.prototype.getRemotes = function () { return Array.from(this.remotes.values()); };
-  NetSync.prototype.update = function (dt, player, loadout, combat) {
-    this.acc += dt;
-    var interval = 1 / ((global.WWNConfig && global.WWNConfig.SYNC_HZ) || 25);
-    if (this.acc < interval) return;
-    this.acc %= interval;
+  NetSync.prototype.tick = function (dt, player, loadout, combat) {
     if (!global.WWNPeer || !player) return;
-    if (!this.localId) this.localId = player.netId || (global.WWNRoom && global.WWNRoom.getState && global.WWNRoom.getState().peerId);
+    this.acc += dt;
+    var hz = (global.WWNConfig && WWNConfig.SYNC_HZ) || 20;
+    if (this.acc < 1 / hz) return;
+    this.acc = 0;
     var now = performance.now() / 1000;
     var snap = {
-      t: "st", id: this.localId,
+      t: "st", id: player.netId || this.localId,
       x: Math.round(player.x * 10) / 10, y: Math.round(player.y * 10) / 10,
       vx: Math.round(player.vx * 10) / 10, vy: Math.round(player.vy * 10) / 10,
       a: Math.round(player.angle * 1000) / 1000, hp: Math.round(player.hp),
       b: player.boosting ? 1 : 0, team: player.team || "NONE",
-      st: loadout && loadout.isStealthed(now) ? 1 : 0, u: player.username || "Pilot",
+      st: loadout && loadout.isStealthed(now) ? 1 : 0, u: player.username || "Pilot"
     };
     try { global.WWNPeer.broadcast(snap); } catch (_) {}
     if (combat) {
@@ -29,6 +30,26 @@
         try { global.WWNPeer.broadcast({ t: "ce", e: evs[i] }); } catch (_) {}
       }
     }
+    this._aiAcc += 1 / hz;
+    if (this.isHost && this._aiAcc >= 0.15) {
+      this._aiAcc = 0;
+      this._broadcastAi();
+    }
+  };
+  NetSync.prototype._broadcastAi = function () {
+    var list = global.__wwnAiList || [];
+    if (!list.length || !global.WWNPeer) return;
+    var payload = [];
+    for (var i = 0; i < list.length && payload.length < 80; i++) {
+      var b = list[i];
+      if (!b) continue;
+      payload.push({
+        id: b.netId || b.id, g: b.group || "G1", al: b.isAlly ? 1 : 0,
+        x: Math.round(b.x), y: Math.round(b.y), a: Math.round((b.angle || 0) * 100) / 100,
+        hp: Math.round(b.hp || 0), alive: b.alive ? 1 : 0, role: b.allyType || ""
+      });
+    }
+    try { global.WWNPeer.broadcast({ t: "ai", bots: payload }); } catch (_) {}
   };
   NetSync.prototype.bind = function () {
     if (!global.WWNPeer || this._bound) return;
@@ -39,8 +60,10 @@
       if (msg.t === "st") self._onState(msg);
       else if (msg.t === "ce" && msg.e) self._onCombat(msg.e);
       else if (msg.t === "respawn") self._onRespawn(msg);
+      else if (msg.t === "ai" && msg.bots) self._onAi(msg.bots);
     };
-    global.WWNPeer.on("data", this._dataHandler); this._bound = true;
+    global.WWNPeer.on("data", this._dataHandler);
+    this._bound = true;
   };
   NetSync.prototype.unbind = function () {
     if (this._bound && global.WWNPeer && global.WWNPeer.off) global.WWNPeer.off("data", this._dataHandler);
@@ -55,7 +78,30 @@
   NetSync.prototype._onCombat = function (ev) { if (this.onCombatEvent) this.onCombatEvent(ev); };
   NetSync.prototype._onRespawn = function (msg) {
     var rp = msg.id && this.remotes.get(msg.id);
-    if (rp) { rp.hp = 100; rp.alive = true; rp.x = msg.x || 0; rp.y = msg.y || 0; rp._renderX = rp.x; rp._renderY = rp.y; }
+    if (rp) {
+      rp.hp = (global.WWNConfig && WWNConfig.HP_MAX) || 320;
+      rp.alive = true; rp.x = msg.x || 0; rp.y = msg.y || 0;
+      rp._renderX = rp.x; rp._renderY = rp.y;
+    }
+  };
+  NetSync.prototype._onAi = function (bots) {
+    if (this.isHost) return;
+    var list = global.__wwnAiList;
+    if (!list || !global.WWNAiPilot) return;
+    var byId = {};
+    for (var i = 0; i < list.length; i++) if (list[i]) byId[list[i].netId || list[i].id] = list[i];
+    bots.forEach(function (s) {
+      var b = byId[s.id];
+      if (!b) {
+        try {
+          b = new WWNAiPilot(s.id, "normal", 0, s.al ? "ALLY" : (s.g || "G1"), s.role || null);
+          b.isAlly = !!s.al; list.push(b); byId[s.id] = b;
+        } catch (e) { return; }
+      }
+      b.x = b.x * 0.35 + s.x * 0.65; b.y = b.y * 0.35 + s.y * 0.65;
+      b.angle = s.a; b.hp = s.hp; b.alive = !!s.alive;
+      if (s.role) b.allyType = s.role;
+    });
   };
   NetSync.prototype.removePlayer = function (id) { this.remotes.delete(id); };
   NetSync.prototype.updateRemotes = function (dt) {
