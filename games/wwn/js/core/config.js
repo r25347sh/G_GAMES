@@ -1,13 +1,14 @@
 (function (global) {
   "use strict";
   global.WWNConfig = {
-    WORLD_SIZE: 12000, BORDER_WARN: 500, MAX_SPEED: 440, ACCEL: 560, DRAG: 1.9,
+    WORLD_SIZE: 9000, BORDER_WARN: 400, MAX_SPEED: 440, ACCEL: 560, DRAG: 1.9,
     TURN_RATE: 3.45, BOOST_MULT: 1.82, BOOST_DRAIN: 30, BOOST_REGEN: 14, BOOST_MAX: 100,
     CAM_LOOKAHEAD: 110, CAM_SMOOTH: 9.5, HP_MAX: 100, SHIP_RADIUS: 18,
     SYNC_HZ: 20, INTERP_DELAY: 0.1, RESPAWN_SEC: 4,
-    MAX_PROJECTILES: 140, MAX_PARTICLES: 120, MAX_MINES: 18, MAX_DECOYS: 8,
+    MAX_PROJECTICLES: 140, MAX_PARTICLES: 120, MAX_MINES: 18, MAX_DECOYS: 8,
   };
-  // Non-secret loadout: modest damage with meaningful weapon-specific tradeoffs.
+  // fix typo max projectiles key used elsewhere
+  global.WWNConfig.MAX_PROJECTILES = 140;
   global.WWNWeapons = {
     vulcan: { id: "vulcan", slot: "main", name: "バルカン", dmg: 6, rate: 10, speed: 880, life: 1.1, heat: 8, cool: 25, overheat: 100, color: "#ffd700", radius: 3 },
     laser: { id: "laser", slot: "main", name: "レーザー", dmg: 17, rate: 3.0, speed: 0, life: 0.08, energy: 24, energyMax: 100, energyRegen: 18, color: "#00f5ff", width: 4, range: 820 },
