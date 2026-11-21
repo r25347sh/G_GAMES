@@ -45,12 +45,14 @@
       this.trail.push({ x: this.x, y: this.y, a: 1, boost: this.boosting });
       if (this.trail.length > 32) this.trail.shift();
     }
-    for (var i = 0; i < this.trail.length; i++) this.trail[i].a *= 0.9;
-    this.trail = this.trail.filter(function (t) { return t.a > 0.04; });
+    for (var i = this.trail.length - 1; i >= 0; i--) {
+      this.trail[i].a -= dt * 1.8;
+      if (this.trail[i].a <= 0) this.trail.splice(i, 1);
+    }
   };
   Player.prototype.kill = function () {
-    this.alive = false; this.hp = 0; this.deaths++;
-    this.respawnTimer = global.WWNConfig.RESPAWN_SEC; this.vx = 0; this.vy = 0;
+    this.alive = false; this.deaths++; this.vx = 0; this.vy = 0;
+    this.respawnTimer = global.WWNConfig.RESPAWN_SEC;
   };
   Player.prototype.tryRespawn = function () {
     if (this.alive || this.respawnTimer > 0) return false;
@@ -60,12 +62,15 @@
     this.vx = 0; this.vy = 0; return true;
   };
   Player.prototype.draw = function (ctx, cam, stealthed) {
-    if (!this.alive) return;
-    var sx = this.x - cam.x + cam.w / 2, sy = this.y - cam.y + cam.h / 2;
+    if (!this.alive || !cam) return;
+    var z = cam.zoom || 1;
+    var sx = cam.sx ? cam.sx(this.x) : (this.x - cam.x) * z + cam.w / 2;
+    var sy = cam.sy ? cam.sy(this.y) : (this.y - cam.y) * z + cam.h / 2;
     if (stealthed) ctx.globalAlpha = 0.35;
     for (var i = 0; i < this.trail.length; i++) {
       var t = this.trail[i];
-      var tx = t.x - cam.x + cam.w / 2, ty = t.y - cam.y + cam.h / 2;
+      var tx = cam.sx ? cam.sx(t.x) : (t.x - cam.x) * z + cam.w / 2;
+      var ty = cam.sy ? cam.sy(t.y) : (t.y - cam.y) * z + cam.h / 2;
       ctx.beginPath(); ctx.arc(tx, ty, t.boost ? 4.5 : 2.6, 0, Math.PI * 2);
       ctx.fillStyle = t.boost ? "rgba(0,245,255," + t.a * 0.58 + ")" : "rgba(255,45,149," + t.a * 0.42 + ")";
       ctx.fill();
@@ -77,11 +82,10 @@
       ctx.fillStyle = grd; ctx.beginPath(); ctx.moveTo(-8, -6); ctx.lineTo(-24 - Math.random() * 12, 0); ctx.lineTo(-8, 6); ctx.closePath(); ctx.fill(); ctx.restore();
     }
     ctx.save(); ctx.translate(sx, sy); ctx.rotate(this.angle);
-    ctx.shadowColor = "#00f5ff"; ctx.shadowBlur = this.boosting ? 20 : 9;
-    ctx.beginPath(); ctx.moveTo(17, 0); ctx.lineTo(-13, 11); ctx.lineTo(-7, 0); ctx.lineTo(-13, -11); ctx.closePath();
-    ctx.fillStyle = "#e8f7ff"; ctx.fill(); ctx.strokeStyle = "rgba(0,245,255,0.9)"; ctx.lineWidth = 1.6; ctx.stroke();
-    ctx.beginPath(); ctx.arc(5, 0, 3.6, 0, Math.PI * 2); ctx.fillStyle = "rgba(255,45,149,0.92)"; ctx.fill();
-    ctx.shadowBlur = 0; ctx.restore(); ctx.globalAlpha = 1;
+    ctx.beginPath(); ctx.moveTo(18, 0); ctx.lineTo(-12, 10); ctx.lineTo(-6, 0); ctx.lineTo(-12, -10); ctx.closePath();
+    ctx.fillStyle = "#e8f7ff"; ctx.fill(); ctx.strokeStyle = "#00f5ff"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.restore();
+    ctx.globalAlpha = 1;
   };
   global.WWNPlayer = Player;
 })(typeof window !== "undefined" ? window : globalThis);
