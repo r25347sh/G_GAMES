@@ -3,23 +3,21 @@
   function friendly(a, b) {
     if (!a || !b) return false;
     if (a === "NONE" || b === "NONE") return false;
-    if (a === b) return true;
-    var blue = { BLUE: 1, ALLY: 1, TEAM_BLUE: 1 };
-    if (blue[a] && blue[b]) return true;
-    return false;
+    return a === b;
   }
   function isFriendlyEntity(p, t) {
     if (!p || !t) return false;
-    if (t.isAlly && (p.team === "BLUE" || p.team === "ALLY" || p.team === t.team)) return true;
-    if (p.isAlly && (t.team === "BLUE" || t.team === "ALLY" || t.isAlly)) return true;
-    return friendly(p.team, t.team);
+    if (p.ownerId && (t.netId === p.ownerId || t.ownerId === p.ownerId)) return true;
+    if (t.ownerId && p.netId && t.ownerId === p.netId) return true;
+    if (p.team && t.team && p.team === t.team && p.team !== "NONE") return true;
+    return false;
   }
   function explodeAt(combat, x, y, aoe, dmg, ownerId, team, targets) {
     combat.spawnParticle(x, y, "#ff6b6b", 18, 140);
     (targets || []).forEach(function (t) {
       if (!t || !t.alive) return;
       if (t.netId === ownerId) return;
-      if (friendly(team, t.team) || (t.isAlly && (team === "BLUE" || team === "ALLY"))) return;
+      if (isFriendlyEntity({ team: team, ownerId: ownerId }, t)) return;
       var d = Math.hypot(t.x - x, t.y - y);
       if (d <= aoe + (t.radius || 18)) {
         var falloff = 1 - (d / (aoe + 20)) * 0.5;
@@ -68,7 +66,7 @@
         e.r = Math.min(e.maxR || 160, (e.r || 0) + 80 * dt);
         targets.forEach(function (t) {
           if (!t || t.netId === e.ownerId) return;
-          if (e.team && t.team && e.team === t.team && t.team !== "NONE") return;
+          if (e.team && t.team && e.team === t.team) return;
           var dx = e.x - t.x, dy = e.y - t.y, d = Math.hypot(dx, dy) || 1;
           if (d < e.r + 40) {
             var pull = 220 * dt;
