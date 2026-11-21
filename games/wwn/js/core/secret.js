@@ -24,7 +24,10 @@
     randomgimmick: { name: "ランダムギミック", slot: "secret" },
     nova: { name: "ノヴァ", slot: "secret" },
     overdrive: { name: "オーバードライブ", slot: "secret" },
-    terminal: { name: "ターミナル", slot: "secret" }
+    terminal: { name: "ターミナル", slot: "secret" },
+    omnistorm: { name: "オムニストーム", slot: "secret" },
+    worldshift: { name: "ワールドシフト", slot: "secret" },
+    godray: { name: "ゴッドレイ360", slot: "secret" }
   };
   var PHRASES = {
     orbitallaser: "orbitallaser", blackhole: "blackhole", cyberpulse: "cyber",
@@ -34,7 +37,8 @@
     minering: "minering", shadowclone: "shadowclone", barrierdome: "barrierdome",
     cryofield: "cryofield", wingman: "wingman", aetherwing: "aetherwing",
     kagebunshin: "kagebunshin", randomgimmick: "randomgimmick",
-    novasurge: "nova", overdrive: "overdrive", rootaccess: "terminal"
+    novasurge: "nova", overdrive: "overdrive", rootaccess: "terminal",
+    omnistorm: "omnistorm", worldshift: "worldshift", godray: "godray"
   };
   var unlocked = {}, buffer = "", lastKey = 0;
   try { var saved = localStorage.getItem("wwn_secrets"); if (saved) unlocked = JSON.parse(saved) || {}; } catch (e) {}
@@ -52,22 +56,11 @@
           setTimeout(function () { t.classList.remove("show"); }, 2200);
         }
       } catch (e) {}
-      try { window.dispatchEvent(new CustomEvent("wwn-secret-unlock", { detail: id })); } catch (e) {}
     }
     return true;
   }
   function getUnlockedList() { return Object.keys(unlocked).filter(function (k) { return unlocked[k] && EFFECT_META[k]; }); }
   function getMeta(id) { return EFFECT_META[id] || { name: id, slot: "secret" }; }
-  function tryResolve() {
-    var now = performance.now(); if (now - lastKey > 3500) buffer = "";
-    var lower = buffer.toLowerCase(), found = null;
-    var keys = Object.keys(PHRASES).sort(function (a, b) { return b.length - a.length; });
-    for (var i = 0; i < keys.length; i++) {
-      if (lower.slice(-keys[i].length) === keys[i]) { found = PHRASES[keys[i]]; break; }
-    }
-    if (!found) return Promise.resolve(null);
-    buffer = ""; unlock(found); return Promise.resolve(found);
-  }
   function onKey(ch) {
     if (!ch || ch.length !== 1) return;
     var now = performance.now(); if (now - lastKey > 3500) buffer = "";
@@ -86,8 +79,12 @@
       if (combat && combat.spawnParticles) try { combat.spawnParticles(player.x, player.y, color || "#0ff", n || 20); } catch (e) {}
     }
     if (effectId === "orbitallaser") {
-      if (api.damageRay) api.damageRay(player.x, player.y, player.angle, 1200, 55, 36);
-      if (combat && combat.effects) combat.effects.push({ type: "orbital", x: player.x, y: player.y, angle: player.angle, range: 1200, width: 28, life: 0.35, color: "#00f5ff" });
+      if (api.damageRay) api.damageRay(player.x, player.y, player.angle, 1200, 70, 40);
+      if (combat && combat.effects) combat.effects.push({
+        type: "orbital", x: player.x, y: player.y, angle: player.angle,
+        range: 1400, width: 32, life: 0.45, color: "#00f5ff",
+        dmg: 70, ownerId: player.netId || "local", team: player.team || "NONE"
+      });
       boom("#00f5ff", 40); return true;
     }
     if (effectId === "blackhole") {
@@ -128,6 +125,33 @@
     if (effectId === "randomgimmick") { boom("#ffd54f", 24); return true; }
     if (effectId === "nova") { if (api.novaDamage) api.novaDamage(player, 320, 40); boom("#fff59d", 40); return true; }
     if (effectId === "overdrive") { player.boost = (global.WWNConfig && WWNConfig.BOOST_MAX) || 100; if (api.refill) api.refill(); boom("#ff8a65", 20); return true; }
+    if (effectId === "omnistorm") {
+      if (combat && combat.effects) combat.effects.push({
+        type: "omni", x: player.x, y: player.y, r: 40, maxR: 720, life: 1.2,
+        dmg: 28, ownerId: player.netId || "local", team: player.team || "NONE", color: "#ff1744"
+      });
+      boom("#ff1744", 50); return true;
+    }
+    if (effectId === "worldshift") {
+      if (combat && combat.effects) combat.effects.push({
+        type: "worldshift", x: player.x, y: player.y, life: 6,
+        ownerId: player.netId || "local", team: player.team || "NONE"
+      });
+      boom("#76ff03", 40); return true;
+    }
+    if (effectId === "godray") {
+      if (combat && combat.effects) {
+        for (var gi = 0; gi < 12; gi++) {
+          var ga = (Math.PI * 2 * gi) / 12;
+          combat.effects.push({
+            type: "orbital", x: player.x, y: player.y, angle: ga,
+            range: 900, width: 14, life: 0.4, color: "#ffea00",
+            dmg: 40, ownerId: player.netId || "local", team: player.team || "NONE"
+          });
+        }
+      }
+      boom("#ffea00", 60); return true;
+    }
     if (effectId === "terminal") { if (global.WWNTerminal && WWNTerminal.open) WWNTerminal.open(); return true; }
     boom("#fff", 12); return true;
   }
@@ -137,7 +161,7 @@
     if (e.key && e.key.length === 1) onKey(e.key);
   }, true);
   global.WWNSecret = {
-    onKey: onKey, tryResolve: tryResolve, applyEffect: applyEffect,
+    onKey: onKey, applyEffect: applyEffect,
     unlock: unlock, getUnlockedList: getUnlockedList, getMeta: getMeta, EFFECT_META: EFFECT_META
   };
 })(typeof window !== "undefined" ? window : globalThis);
