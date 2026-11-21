@@ -1,26 +1,42 @@
 (function () {
   "use strict";
+  var joining = false, cpuCount = 5, cpuDiff = "normal";
   function toast(msg) {
-    var el = document.getElementById("toast");
-    if (!el) return;
-    el.textContent = msg; el.classList.add("show");
-    setTimeout(function () { el.classList.remove("show"); }, 2400);
+    var t = document.getElementById("toast");
+    if (!t) return;
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(function () { t.classList.remove("show"); }, 2400);
   }
-  var cpuCount = 1, cpuDiff = "normal", joining = false;
   function bindModeGrid() {
-    document.querySelectorAll(".mode-grid").forEach(function (grid) {
-      grid.addEventListener("click", function (e) {
-        var btn = e.target.closest(".mode-btn"); if (!btn) return;
+    var grid = document.getElementById("mode-grid");
+    if (!grid) return;
+    grid.querySelectorAll(".mode-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
         grid.querySelectorAll(".mode-btn").forEach(function (b) { b.classList.remove("active"); });
         btn.classList.add("active");
-        if (btn.dataset.cpu) cpuCount = parseInt(btn.dataset.cpu, 10) || 1;
+      });
+    });
+    document.querySelectorAll(".cpu-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        if (btn.dataset.cpu) cpuCount = parseInt(btn.dataset.cpu, 10) || 5;
         if (btn.dataset.diff) cpuDiff = btn.dataset.diff;
+        document.querySelectorAll(".cpu-btn").forEach(function (b) {
+          if (b.dataset.cpu || b.dataset.diff) b.classList.toggle("active", b === btn);
+        });
       });
     });
   }
   function doSortie() {
-    var room = window.WWNRoom && WWNRoom.getState && WWNRoom.getState();
-    if (window.WWNGame) window.WWNGame.start({ mode: "online", netId: room && room.peerId, team: room && room.team, username: room && room.username });
+    var room = window.WWNRoom && WWNRoom.getState ? WWNRoom.getState() : null;
+    var team = (room && room.team && room.team !== "NONE") ? room.team : "BLUE";
+    if (window.WWNGame) window.WWNGame.start({
+      mode: "online",
+      netId: room && room.peerId,
+      team: team,
+      username: room && room.username,
+      isOwner: !!(room && room.isOwner)
+    });
   }
   function doSolo() { if (window.WWNGame) WWNGame.start({ mode: "solo" }); }
   function doCpu() {
@@ -37,7 +53,7 @@
     joining = true;
     WWNRoom.joinOrCreate({ username: username, roomName: roomName, roomKey: roomKey, mode: mode })
       .then(function () {
-        toast("P2Pルームに接続しました");
+        toast("P2Pルームに接続しました（途中参加OK）");
         var form = document.getElementById("form-panel"), conn = document.getElementById("connected-panel");
         if (form) form.classList.add("hidden"); if (conn) conn.classList.remove("hidden");
         if (mode === "open") setTimeout(doSortie, 600);
