@@ -22,7 +22,7 @@
   NetSync.prototype.tick = function (dt, player, loadout, combat) {
     if (!global.WWNPeer || !player) return;
     this.acc += dt;
-    var hz = (global.WWNConfig && WWNConfig.SYNC_HZ) || 20;
+    var hz = (global.WWNConfig && WWNConfig.SYNC_HZ) || 25;
     if (this.acc < 1 / hz) return;
     this.acc = 0;
     var now = performance.now() / 1000;
@@ -50,7 +50,7 @@
       this._dmgOut.length = 0;
     }
     this._allyAcc += 1 / hz;
-    if (this._allyAcc >= 0.12) { this._allyAcc = 0; this._broadcastAllies(); }
+    if (this._allyAcc >= 0.05) { this._allyAcc = 0; this._broadcastAllies(); }
     this._aiAcc += 1 / hz;
     if (this.isHost && this._aiAcc >= 0.18) { this._aiAcc = 0; this._broadcastAi(); }
   };
@@ -64,8 +64,10 @@
       if (b._remoteAlly) continue;
       if (b.ownerId && lid && b.ownerId !== lid) continue;
       payload.push({
-        id: b.netId || b.id, x: Math.round(b.x), y: Math.round(b.y),
-        a: Math.round((b.angle || 0) * 100) / 100, hp: Math.round(b.hp || 0),
+        id: b.netId || b.id,
+        x: Math.round(b.x * 10) / 10, y: Math.round(b.y * 10) / 10,
+        vx: Math.round((b.vx || 0) * 10) / 10, vy: Math.round((b.vy || 0) * 10) / 10,
+        a: Math.round((b.angle || 0) * 1000) / 1000, hp: Math.round(b.hp || 0),
         hm: Math.round(b.hpMax || 200), team: b.team || "ALLY",
         owner: b.ownerId || lid, role: b.allyType || "striker", alive: 1
       });
@@ -177,8 +179,15 @@
       if (b.ownerId && global.__wwnPlayer && b.ownerId === global.__wwnPlayer.netId && !b._remoteAlly) return;
       b.isAlly = true; b._remoteAlly = true;
       b.ownerId = s.owner || owner; b.team = s.team; b.allyType = s.role || b.allyType;
-      b.x = b.x * 0.25 + s.x * 0.75; b.y = b.y * 0.25 + s.y * 0.75;
-      b.angle = s.a; b.hp = s.hp; b.hpMax = s.hm || b.hpMax; b.alive = true;
+      b._tx = s.x; b._ty = s.y;
+      b._tvx = s.vx || 0; b._tvy = s.vy || 0;
+      b._tangle = s.a;
+      b._snapT = performance.now() / 1000;
+      if (b.x == null || !b._smoothInit) {
+        b.x = s.x; b.y = s.y; b.angle = s.a; b._smoothInit = true;
+      }
+      b.vx = s.vx || 0; b.vy = s.vy || 0;
+      b.hp = s.hp; b.hpMax = s.hm || b.hpMax; b.alive = true;
     });
     for (var j = list.length - 1; j >= 0; j--) {
       var bot = list[j];
