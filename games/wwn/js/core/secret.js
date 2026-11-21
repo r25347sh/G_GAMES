@@ -9,6 +9,7 @@
     leech: { name: "リーチ", slot: "secret" },
     shieldwall: { name: "シールドウォール", slot: "secret" },
     hive: { name: "ハイヴ変換", slot: "secret" },
+    hiveconvert: { name: "ハイヴ変換", slot: "secret" },
     tether: { name: "テザー", slot: "secret" },
     repairbot: { name: "修理ドローン", slot: "secret" },
     kamikaze: { name: "カミカゼ", slot: "secret" },
@@ -19,6 +20,8 @@
     cryofield: { name: "凍結フィールド", slot: "secret" },
     wingman: { name: "5機小隊", slot: "secret" },
     aetherwing: { name: "エーテルウィング", slot: "secret" },
+    kagebunshin: { name: "影分身×30", slot: "secret" },
+    randomgimmick: { name: "ランダムギミック", slot: "secret" },
     nova: { name: "ノヴァ", slot: "secret" },
     overdrive: { name: "オーバードライブ", slot: "secret" },
     terminal: { name: "ターミナル", slot: "secret" }
@@ -26,10 +29,11 @@
   var PHRASES = {
     orbitallaser: "orbitallaser", blackhole: "blackhole", cyberpulse: "cyber",
     droneswarm: "droneswarm", turretpod: "turretpod", leechbite: "leech",
-    shieldwall: "shieldwall", hiveconvert: "hive", tetheranchor: "tether",
+    shieldwall: "shieldwall", hiveconvert: "hiveconvert", tetheranchor: "tether",
     repairdrone: "repairbot", kamikazesuicide: "kamikaze", orbitalsat: "orbitalsat",
     minering: "minering", shadowclone: "shadowclone", barrierdome: "barrierdome",
     cryofield: "cryofield", wingman: "wingman", aetherwing: "aetherwing",
+    kagebunshin: "kagebunshin", randomgimmick: "randomgimmick",
     novasurge: "nova", overdrive: "overdrive", rootaccess: "terminal"
   };
   var unlocked = {}, buffer = "", lastKey = 0;
@@ -41,18 +45,22 @@
   function tryResolve() {
     var now = performance.now(); if (now - lastKey > 3500) buffer = "";
     var lower = buffer.toLowerCase(), found = null;
-    Object.keys(PHRASES).forEach(function (phrase) { if (lower.slice(-phrase.length) === phrase) found = PHRASES[phrase]; });
+    Object.keys(PHRASES).forEach(function (phrase) {
+      if (lower.slice(-phrase.length) === phrase) found = PHRASES[phrase];
+    });
     if (!found) return Promise.resolve(null);
     buffer = ""; unlock(found); return Promise.resolve(found);
   }
   function onKey(ch) {
     if (!ch || ch.length !== 1) return;
     var now = performance.now(); if (now - lastKey > 3500) buffer = "";
-    lastKey = now; buffer = (buffer + ch.toLowerCase()).slice(-24);
+    lastKey = now; buffer = (buffer + ch.toLowerCase()).slice(-28);
   }
   function applyEffect(effectId, player, combat, api) {
     api = api || {};
-    function boom(color, n) { if (combat && combat.spawnParticles) try { combat.spawnParticles(player.x, player.y, color || "#0ff", n || 20); } catch (e) {} }
+    function boom(color, n) {
+      if (combat && combat.spawnParticles) try { combat.spawnParticles(player.x, player.y, color || "#0ff", n || 20); } catch (e) {}
+    }
     if (effectId === "orbitallaser") {
       if (api.damageRay) api.damageRay(player.x, player.y, player.angle, 1200, 55, 36);
       if (combat && combat.effects) combat.effects.push({ type: "orbital", x: player.x, y: player.y, angle: player.angle, range: 1200, width: 28, life: 0.35, color: "#00f5ff" });
@@ -67,7 +75,7 @@
     if (effectId === "turretpod") { if (api.spawnTurret) api.spawnTurret(); boom("#ff9800", 16); return true; }
     if (effectId === "leech") { if (api.spawnLeech) api.spawnLeech(); boom("#c62828", 16); return true; }
     if (effectId === "shieldwall") { if (api.spawnShield) api.spawnShield(6); boom("#81d4fa", 16); return true; }
-    if (effectId === "hive") { if (api.hiveConvert) api.hiveConvert(); boom("#a5d6a7", 20); return true; }
+    if (effectId === "hive" || effectId === "hiveconvert") { if (api.hiveConvert) api.hiveConvert(); boom("#a5d6a7", 24); return true; }
     if (effectId === "tether") { if (api.spawnTether) api.spawnTether(); boom("#ffd54f", 16); return true; }
     if (effectId === "repairbot") { if (api.spawnRepairBot) api.spawnRepairBot(); boom("#69f0ae", 16); return true; }
     if (effectId === "kamikaze") { if (api.spawnKamikaze) api.spawnKamikaze(); boom("#ff5252", 20); return true; }
@@ -84,6 +92,8 @@
       if (api.novaDamage) api.novaDamage(player, 220, 18);
       boom("#e1bee7", 50); return true;
     }
+    if (effectId === "kagebunshin") { boom("#b388ff", 40); return true; }
+    if (effectId === "randomgimmick") { boom("#ffd54f", 24); return true; }
     if (effectId === "nova") { if (api.novaDamage) api.novaDamage(player, 320, 40); boom("#fff59d", 40); return true; }
     if (effectId === "overdrive") { player.boost = (global.WWNConfig && WWNConfig.BOOST_MAX) || 100; if (api.refill) api.refill(); boom("#ff8a65", 20); return true; }
     if (effectId === "terminal") { if (global.WWNTerminal && WWNTerminal.open) WWNTerminal.open(); return true; }
@@ -94,5 +104,8 @@
     if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
     if (e.key && e.key.length === 1) onKey(e.key);
   }, true);
-  global.WWNSecret = { onKey: onKey, tryResolve: tryResolve, applyEffect: applyEffect, unlock: unlock, getUnlockedList: getUnlockedList, getMeta: getMeta, EFFECT_META: EFFECT_META };
+  global.WWNSecret = {
+    onKey: onKey, tryResolve: tryResolve, applyEffect: applyEffect,
+    unlock: unlock, getUnlockedList: getUnlockedList, getMeta: getMeta, EFFECT_META: EFFECT_META
+  };
 })(typeof window !== "undefined" ? window : globalThis);
