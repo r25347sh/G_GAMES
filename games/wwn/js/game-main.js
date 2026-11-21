@@ -50,8 +50,12 @@
     n = Math.min(5, n || 5);
     for (var i = 0; i < n; i++) {
       try {
-        var bot = new WWNAiPilot("cpu-ally-" + (aiList.length + 1), "normal", i, "ALLY", types[i % types.length]);
-        bot.isAlly = true; bot.group = "ALLY"; bot.team = "BLUE"; bot.roleIndex = i;
+        var bot = new WWNAiPilot("ally-" + (player && player.netId) + "-" + i, "normal", i, "ALLY", types[i % types.length]);
+        bot.isAlly = true; bot.group = "ALLY";
+        bot.team = player.team || "BLUE";
+        bot.ownerId = player.netId;
+        bot.leaderId = player.netId;
+        bot.roleIndex = i;
         if (player) {
           var a = player.angle + Math.PI + (i - 2) * 0.4, d = 70 + i * 14;
           bot.x = player.x + Math.cos(a) * d; bot.y = player.y + Math.sin(a) * d;
@@ -90,16 +94,27 @@
       world = new WWNWorld();
       combat = new WWNCombat();
       loadout = new WWNWeaponLoadout();
-      try { mapHazards = new WWNMapHazards(); } catch (e) { mapHazards = null; }
+      try {
+        var seedStr = (options.roomName || options.netId || "solo") + "|" + (options.mode || "");
+        var seed = 0;
+        for (var si = 0; si < seedStr.length; si++) seed = (seed * 31 + seedStr.charCodeAt(si)) >>> 0;
+        window.__wwnMapSeed = seed || 1;
+        mapHazards = new WWNMapHazards();
+      } catch (e) { mapHazards = null; }
       scoreBoard = window.WWNScoreBoard ? new WWNScoreBoard() : null;
       supports = window.WWNSupportSystem ? new WWNSupportSystem() : null;
       netSync = new WWNNetSync();
       player.alive = true;
       player.hp = WWNConfig.HP_MAX;
       player.boost = WWNConfig.BOOST_MAX;
-      player.team = (options.team && options.team !== "NONE") ? options.team : "BLUE";
       player.netId = options.netId || ("local-" + Math.random().toString(36).slice(2, 8));
-      player.username = options.username || player.username || "Pilot";
+      if (options.mode === "online" || options.mode === "open" || options.mode === "1v1" || options.mode === "team") {
+        if (options.mode === "team" && options.team && options.team !== "NONE") player.team = options.team;
+        else player.team = "T_" + player.netId;
+      } else {
+        player.team = (options.team && options.team !== "NONE") ? options.team : "BLUE";
+      }
+      player.username = options.username || "Pilot";
       try {
         window.__wwnNetSync = netSync;
         netSync.setLocalId(player.netId);
@@ -115,11 +130,8 @@
       WWNInput.bind(canvas);
       if (options.mode === "cpu" || options.cpuCount) {
         var diff = options.diff || options.difficulty || "normal";
-        if (options.over || options.mode === "over") {
-          spawnCpuBots(Math.max(40, Math.min(60, options.cpuCount || 48)), diff, true);
-        } else {
-          spawnCpuBots(options.cpuCount || 5, diff, false);
-        }
+        if (options.over || options.mode === "over") spawnCpuBots(Math.max(40, Math.min(60, options.cpuCount || 48)), diff, true);
+        else spawnCpuBots(options.cpuCount || 5, diff, false);
       } else if (options.mode === "solo") {
         spawnCpuBots(7, "easy", false);
       } else if (options.mode === "online" || options.mode === "open") {
@@ -130,8 +142,7 @@
       updateWeaponHud(); updateSecretHud();
       window.__wwnPlayer = player; window.__wwnCombat = combat; window.__wwnAiList = aiList;
       window.__wwnNetSync = netSync; window.__wwnLoadout = loadout; window.__wwnCamera = camera;
-      window.__wwnRemotes = netSync && netSync.getRemotes ? netSync.getRemotes() : [];
-      console.log("[WWN] start ok bots=" + aiList.length);
+      console.log("[WWN] start team=" + player.team + " bots=" + aiList.length);
     } catch (e) {
       console.error("[WWN] start failed", e);
       stopGame();
@@ -156,10 +167,7 @@
       fireSubCd = Math.max(0, fireSubCd - dt);
       fireGadgetCd = Math.max(0, fireGadgetCd - dt);
       secretCd = Math.max(0, secretCd - dt);
-      if (cyberTint > 0) cyberTint = Math.max(0, cyberTint - dt);
-      if (WWNInput.consumeCycleSecret && WWNInput.consumeCycleSecret()) {
-        secretIdx++; updateSecretHud();
-      }
+      if (WWNInput.consumeCycleSecret && WWNInput.consumeCycleSecret()) { secretIdx++; updateSecretHud(); }
       var flight = WWNInput.getFlight();
       var boost = WWNInput.isBoost();
       if (player.alive) player.update(dt, flight, boost);
@@ -167,15 +175,11 @@
       if (WWNInput.consumeCycleSub()) { loadout.cycleSub(); updateWeaponHud(); }
       if (WWNInput.consumeCycleGadget()) { loadout.cycleGadget(); updateWeaponHud(); }
       if (player.alive) {
-        if (WWNInput.consumeFireMain() && fireMainCd <= 0) {
-          combat.fireMain(player, loadout, now); fireMainCd = 0.05;
-        }
+        if (WWNInput.consumeFireMain() && fireMainCd <= 0) { combat.fireMain(player, loadout, now); fireMainCd = 0.05; }
         if (WWNInput.consumeFireSub() && fireSubCd <= 0) {
           combat.fireSub(player, loadout, now, aiList.concat(netSync ? netSync.getRemotes() : [])); fireSubCd = 0.2;
         }
-        if (WWNInput.consumeFireGadget() && fireGadgetCd <= 0) {
-          combat.useGadget(player, loadout, now); fireGadgetCd = 0.25;
-        }
+        if (WWNInput.consumeFireGadget() && fireGadgetCd <= 0) { combat.useGadget(player, loadout, now); fireGadgetCd = 0.25; }
         if (WWNInput.consumeFireSecret && WWNInput.consumeFireSecret() && secretCd <= 0 && window.WWNSecret) {
           var ul = WWNSecret.getUnlockedList();
           if (ul.length) {
@@ -197,14 +201,15 @@
               spawnDome: function (n) { if (supports && supports.spawnDome) supports.spawnDome(player, n); },
               spawnFreezer: function () { if (supports && supports.spawnFreezer) supports.spawnFreezer(player); },
               novaDamage: function (pl, r, d) {
-                aiList.forEach(function (t) {
-                  if (!t || !t.alive || t.isAlly) return;
+                aiList.concat(netSync ? netSync.getRemotes() : []).forEach(function (t) {
+                  if (!t || !t.alive) return;
+                  if (t.team === pl.team) return;
                   if (Math.hypot(t.x - pl.x, t.y - pl.y) < r) t.hp = Math.max(0, t.hp - d);
                 });
               },
               damageRay: function (x, y, ang, range, width, dmg) {
-                aiList.forEach(function (t) {
-                  if (!t || !t.alive || t.isAlly) return;
+                aiList.concat(netSync ? netSync.getRemotes() : []).forEach(function (t) {
+                  if (!t || !t.alive || t.team === player.team) return;
                   var dx = t.x - x, dy = t.y - y;
                   var proj = dx * Math.cos(ang) + dy * Math.sin(ang);
                   if (proj < 0 || proj > range) return;
@@ -231,7 +236,6 @@
       if (player && loadout) {
         player.chaffUntil = loadout.chaffUntil || 0;
         player.stealthed = loadout.isStealthed ? loadout.isStealthed(now) : false;
-        if (!player.team || player.team === "NONE") player.team = "BLUE";
       }
       var allEntities = aiList.concat(netSync ? netSync.getRemotes() : []);
       for (var i = 0; i < aiList.length; i++) {
@@ -252,11 +256,9 @@
             var half = (WWNConfig.WORLD_SIZE || 9000) * 0.38;
             if (bot.isAlly && player) {
               var ang = Math.random() * Math.PI * 2;
-              bot.x = player.x + Math.cos(ang) * 120;
-              bot.y = player.y + Math.sin(ang) * 120;
+              bot.x = player.x + Math.cos(ang) * 120; bot.y = player.y + Math.sin(ang) * 120;
             } else {
-              bot.x = (Math.random() - 0.5) * half * 2;
-              bot.y = (Math.random() - 0.5) * half * 2;
+              bot.x = (Math.random() - 0.5) * half * 2; bot.y = (Math.random() - 0.5) * half * 2;
             }
             bot.vx = 0; bot.vy = 0;
           }
@@ -274,21 +276,17 @@
       if (player.alive && player.hp <= 0) {
         player.kill();
         pushKillFeed("撃破された…");
-        if (els.respawnOverlay) els.respawnOverlay.classList.remove("hidden");
       }
       if (player && !player.alive) {
         if (els.respawnOverlay) {
           els.respawnOverlay.classList.remove("hidden");
-          els.respawnOverlay.textContent = (player.respawnTimer > 0.05)
-            ? ("再出撃… " + player.respawnTimer.toFixed(1) + "s") : "再出撃中";
+          els.respawnOverlay.textContent = (player.respawnTimer > 0.05) ? ("再出撃… " + player.respawnTimer.toFixed(1) + "s") : "再出撃中";
         }
         if ((player.respawnTimer || 0) <= 0 && player.tryRespawn && player.tryRespawn()) {
           if (loadout && loadout.refillAmmo) loadout.refillAmmo();
           if (els.respawnOverlay) els.respawnOverlay.classList.add("hidden");
         }
-      } else if (els.respawnOverlay) {
-        els.respawnOverlay.classList.add("hidden");
-      }
+      } else if (els.respawnOverlay) els.respawnOverlay.classList.add("hidden");
       if (camera && player.alive) camera.follow(player, dt);
       else if (camera && player) { camera.x = player.x; camera.y = player.y; }
     } catch (e) { console.error("[WWN update]", e); }
@@ -328,27 +326,13 @@
       }
     } catch (e) {}
     try {
-      var now = performance.now() / 1000;
-      var stl = loadout && loadout.isStealthed ? loadout.isStealthed(now) : false;
+      var stl = loadout && loadout.isStealthed ? loadout.isStealthed(performance.now() / 1000) : false;
       if (player) player.draw(ctx, camera, stl);
-    } catch (e) {
-      if (player && camera) {
-        var px = player.x - camera.x + w / 2, py = player.y - camera.y + h / 2;
-        ctx.fillStyle = "#00f5ff"; ctx.beginPath(); ctx.arc(px, py, 14, 0, Math.PI * 2); ctx.fill();
-      }
-    }
-    if (cyberTint > 0) {
-      ctx.fillStyle = "rgba(0,245,255," + (0.08 * Math.min(1, cyberTint)) + ")";
-      ctx.fillRect(0, 0, w, h);
-    }
+    } catch (e) {}
     try {
       if (minimapCanvas && window.WWNMinimap) WWNMinimap.draw(minimapCanvas, player, aiList, netSync ? netSync.getRemotes() : [], world);
     } catch (e) {}
   }
   window.addEventListener("resize", resize);
-  window.WWNGame = {
-    start: startGame,
-    stop: stopGame,
-    isActive: function () { return active; }
-  };
+  window.WWNGame = { start: startGame, stop: stopGame, isActive: function () { return active; } };
 })();
