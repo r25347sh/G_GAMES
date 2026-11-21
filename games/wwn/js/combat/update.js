@@ -61,15 +61,12 @@
           if (e.team && t.team && e.team === t.team && t.team !== "NONE") return;
           var dx = e.x - t.x, dy = e.y - t.y, d = Math.hypot(dx, dy) || 1;
           if (d < e.r + 40) {
-            var pull = (e.pull || 400) * dt / Math.max(40, d);
+            var pull = 220 * dt;
             t.vx = (t.vx || 0) + (dx / d) * pull;
             t.vy = (t.vy || 0) + (dy / d) * pull;
-            if (e.dmg) t.hp = Math.max(0, (t.hp || 0) - e.dmg);
+            if (e.dmg && d < e.r * 0.4) t.hp = Math.max(0, (t.hp || 0) - e.dmg * dt);
           }
         });
-      }
-      if (e.type === "orbitalBeam" || e.type === "laser") {
-        // visual only; damage applied on fire
       }
       if (e.life <= 0) combat.effects.splice(i, 1);
     }
@@ -97,6 +94,28 @@
         }
       }
       p.x += p.vx * dt; p.y += p.vy * dt;
+      // Cluster split into submunitions
+      if (p.split > 0 && p.life < (p.maxLife || p.life) * 0.45) {
+        var n = Math.min(8, p.split | 0);
+        p.split = 0;
+        p.alive = false;
+        for (var si = 0; si < n; si++) {
+          if (!combat.projectiles || !combat.projectiles.acquire) break;
+          var sub = combat.projectiles.acquire();
+          var ang = p.angle + (si - (n - 1) / 2) * 0.35 + (Math.random() - 0.5) * 0.15;
+          sub.alive = true; sub.type = "clusterbit";
+          sub.x = p.x; sub.y = p.y; sub.angle = ang;
+          sub.vx = Math.cos(ang) * (320 + Math.random() * 80);
+          sub.vy = Math.sin(ang) * (320 + Math.random() * 80);
+          sub.life = 0.85; sub.maxLife = 0.85;
+          sub.dmg = (p.dmg || 10) * 0.55;
+          sub.ownerId = p.ownerId; sub.team = p.team;
+          sub.radius = 4; sub.aoe = 36; sub.color = p.color || "#ffa94d";
+          sub.targetId = null; sub.turn = 0; sub.split = 0;
+        }
+        combat.spawnParticle(p.x, p.y, p.color || "#ffa94d", 14, 100);
+        return;
+      }
       for (var ti = 0; ti < targets.length; ti++) {
         var t = targets[ti];
         if (!t || !t.alive) continue;
@@ -141,16 +160,19 @@
     combat.decoys.forEach(function (d) {
       if (!d.alive) return;
       d.life -= dt;
-      if (d.life <= 0) d.alive = false;
       d.x += (d.vx || 0) * dt; d.y += (d.vy || 0) * dt;
+      if (d.life <= 0) d.alive = false;
     });
     combat.decoys.releaseDead(function (d) { return !d.alive; });
+    if (combat.particles) {
+      combat.particles.forEach(function (p) {
+        if (!p.alive) return;
+        p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt;
+        if (p.life <= 0) p.alive = false;
+      });
+      combat.particles.releaseDead(function (p) { return !p.alive; });
+    }
     updateSpecialEffects(combat, dt, localPlayer, remotes);
-    combat.particles.forEach(function (p) {
-      p.life -= dt; p.x += (p.vx || 0) * dt; p.y += (p.vy || 0) * dt;
-      if (p.life <= 0) p.alive = false;
-    });
-    combat.particles.releaseDead(function (p) { return !p.alive; });
   }
-  global.WWNCombatUpdate = { update: updateCombat, friendly: friendly };
+  global.WWNCombatUpdate = { update: updateCombat, explodeAt: explodeAt, friendly: friendly };
 })(typeof window !== "undefined" ? window : globalThis);
