@@ -105,7 +105,11 @@
     if (effectId === "kamikaze") { if (api.spawnKamikaze) api.spawnKamikaze(); boom("#ff5252", 20); return true; }
     if (effectId === "orbitalsat") { if (api.spawnSatellite) api.spawnSatellite(); boom("#b388ff", 16); return true; }
     if (effectId === "minering") { if (api.spawnMineRing) api.spawnMineRing(); boom("#ff6b6b", 20); return true; }
-    if (effectId === "shadowclone") { if (api.spawnClone) api.spawnClone(); boom("#ce93d8", 16); return true; }
+    if (effectId === "shadowclone") {
+      if (api.spawnKageBunshin) api.spawnKageBunshin(5);
+      else if (api.spawnClone) api.spawnClone();
+      boom("#ce93d8", 16); return true;
+    }
     if (effectId === "barrierdome") { if (api.spawnDome) api.spawnDome(7); boom("#80cbc4", 16); return true; }
     if (effectId === "cryofield") { if (api.spawnFreezer) api.spawnFreezer(); boom("#81d4fa", 16); return true; }
     if (effectId === "wingman") { if (api.spawnAlly) api.spawnAlly(5); boom("#4fc3f7", 24); return true; }
@@ -116,7 +120,11 @@
       if (api.novaDamage) api.novaDamage(player, 220, 18);
       boom("#e1bee7", 50); return true;
     }
-    if (effectId === "kagebunshin") { boom("#b388ff", 40); return true; }
+    if (effectId === "kagebunshin") {
+      if (api.spawnKageBunshin) api.spawnKageBunshin(30);
+      else if (api.spawnClone) { for (var ki = 0; ki < 30; ki++) api.spawnClone(); }
+      boom("#b388ff", 40); return true;
+    }
     if (effectId === "randomgimmick") { boom("#ffd54f", 24); return true; }
     if (effectId === "nova") { if (api.novaDamage) api.novaDamage(player, 320, 40); boom("#fff59d", 40); return true; }
     if (effectId === "overdrive") { player.boost = (global.WWNConfig && WWNConfig.BOOST_MAX) || 100; if (api.refill) api.refill(); boom("#ff8a65", 20); return true; }
