@@ -1,24 +1,27 @@
 (function () {
   "use strict";
 
-  // Expose score board if game created it under other name
-  setInterval(function () {
-    if (!window.__wwnScore && window.WWNScoreBoard) {
-      // try find from HUD updater nothing - create bridge
+  function ensureScore() {
+    if (window.__wwnScore) return window.__wwnScore;
+    if (window.WWNScoreBoard) {
+      window.__wwnScore = new WWNScoreBoard();
+      return window.__wwnScore;
     }
-  }, 1000);
+    return null;
+  }
 
-  // Watch AI deaths for PT (fallback if game-main path missed)
+  function updateHud() {
+    var sb = window.__wwnScore;
+    if (!sb) return;
+    var el = document.getElementById("hud-score");
+    if (el) el.textContent = "PT " + (sb.points || 0);
+  }
+
   var seenDead = {};
   setInterval(function () {
+    var sb = ensureScore();
     var list = window.__wwnAiList;
-    if (!list) return;
-    if (!window.__wwnScore) {
-      // attempt recover from global game if any
-      try {
-        if (window.WWNGame && window.WWNGame.scoreBoard) window.__wwnScore = window.WWNGame.scoreBoard;
-      } catch (e) {}
-    }
+    if (!list || !sb) return;
     for (var i = 0; i < list.length; i++) {
       var b = list[i];
       if (!b || b.isAlly || b._remoteAlly) continue;
@@ -26,15 +29,17 @@
       if ((!b.alive || (b.hp || 0) <= 0) && !seenDead[id]) {
         seenDead[id] = true;
         try {
-          if (window.__wwnScore && window.__wwnScore.onKill) window.__wwnScore.onKill();
-          else if (window.__wwnScore && window.__wwnScore.add) window.__wwnScore.add(100, "kill");
+          if (sb.onKill) sb.onKill();
+          else if (sb.add) sb.add(100, "kill");
         } catch (e) {}
+        updateHud();
       }
       if (b.alive && (b.hp || 0) > 0) delete seenDead[id];
     }
+    if (sb.update) sb.update(0.2);
+    updateHud();
   }, 200);
 
-  // Extra 10 per group (7 groups) once per session after game starts
   var boosted = false;
   setInterval(function () {
     if (boosted) return;
