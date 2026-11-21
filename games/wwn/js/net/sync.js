@@ -42,11 +42,11 @@
     var payload = [];
     for (var i = 0; i < list.length && payload.length < 80; i++) {
       var b = list[i];
-      if (!b) continue;
+      if (!b || b.isAlly) continue;
       payload.push({
-        id: b.netId || b.id, g: b.group || "G1", al: b.isAlly ? 1 : 0,
+        id: b.netId || b.id, g: b.group || "G1", al: 0,
         x: Math.round(b.x), y: Math.round(b.y), a: Math.round((b.angle || 0) * 100) / 100,
-        hp: Math.round(b.hp || 0), alive: b.alive ? 1 : 0, role: b.allyType || ""
+        hp: Math.round(b.hp || 0), alive: b.alive ? 1 : 0, role: ""
       });
     }
     try { global.WWNPeer.broadcast({ t: "ai", bots: payload }); } catch (_) {}
@@ -56,11 +56,15 @@
     var self = this;
     this._dataHandler = function (raw) {
       var msg; try { msg = typeof raw === "string" ? JSON.parse(raw) : raw; } catch (_) { return; }
-      if (!msg || !msg.t) return;
+      if (!msg) return;
+      if (!msg.t && msg.type) msg.t = msg.type;
+      if (!msg.t) return;
       if (msg.t === "st") self._onState(msg);
       else if (msg.t === "ce" && msg.e) self._onCombat(msg.e);
       else if (msg.t === "respawn") self._onRespawn(msg);
       else if (msg.t === "ai" && msg.bots) self._onAi(msg.bots);
+      else if (msg.t === "player-left") self.removePlayer(msg.peerId || msg.id);
+      else if (msg.t === "player-list" && msg.players) self._pruneToList(msg.players);
     };
     global.WWNPeer.on("data", this._dataHandler);
     this._bound = true;
@@ -68,6 +72,7 @@
   NetSync.prototype.unbind = function () {
     if (this._bound && global.WWNPeer && global.WWNPeer.off) global.WWNPeer.off("data", this._dataHandler);
     this._dataHandler = null; this._bound = false;
+    this.remotes.clear();
   };
   NetSync.prototype._onState = function (msg) {
     if (!msg.id || msg.id === this.localId) return;
@@ -92,21 +97,35 @@
     for (var i = 0; i < list.length; i++) if (list[i]) byId[list[i].netId || list[i].id] = list[i];
     bots.forEach(function (s) {
       var b = byId[s.id];
+      if (b && b.isAlly) return;
       if (!b) {
         try {
-          b = new WWNAiPilot(s.id, "normal", 0, s.al ? "ALLY" : (s.g || "G1"), s.role || null);
-          b.isAlly = !!s.al; list.push(b); byId[s.id] = b;
+          b = new WWNAiPilot(s.id, "normal", 0, s.g || "G1", null);
+          b.isAlly = false; list.push(b); byId[s.id] = b;
         } catch (e) { return; }
       }
       b.x = b.x * 0.35 + s.x * 0.65; b.y = b.y * 0.35 + s.y * 0.65;
       b.angle = s.a; b.hp = s.hp; b.alive = !!s.alive;
-      if (s.role) b.allyType = s.role;
     });
   };
-  NetSync.prototype.removePlayer = function (id) { this.remotes.delete(id); };
+  NetSync.prototype.removePlayer = function (id) {
+    if (id) this.remotes.delete(id);
+  };
+  NetSync.prototype._pruneToList = function (players) {
+    var keep = {};
+    (players || []).forEach(function (p) { if (p && p.peerId) keep[p.peerId] = 1; });
+    var self = this;
+    Array.from(this.remotes.keys()).forEach(function (id) {
+      if (id !== self.localId && !keep[id]) self.remotes.delete(id);
+    });
+  };
   NetSync.prototype.updateRemotes = function (dt) {
     var now = performance.now() / 1000;
-    this.remotes.forEach(function (rp) { rp.update(dt, now); });
+    var self = this;
+    this.remotes.forEach(function (rp, id) {
+      rp.update(dt, now);
+      if (rp._lastSnapshot && now - rp._lastSnapshot > 4) self.remotes.delete(id);
+    });
   };
   global.WWNNetSync = NetSync;
 })(typeof window !== "undefined" ? window : globalThis);

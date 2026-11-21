@@ -21,21 +21,19 @@
       btn.addEventListener("click", function () {
         if (btn.dataset.cpu) cpuCount = parseInt(btn.dataset.cpu, 10) || 5;
         if (btn.dataset.diff) cpuDiff = btn.dataset.diff;
-        document.querySelectorAll(".cpu-btn").forEach(function (b) {
-          if (b.dataset.cpu || b.dataset.diff) b.classList.toggle("active", b === btn);
-        });
       });
     });
   }
   function doSortie() {
     var room = window.WWNRoom && WWNRoom.getState ? WWNRoom.getState() : null;
-    var team = (room && room.team && room.team !== "NONE") ? room.team : "BLUE";
+    var team = (room && room.mode === "team" && room.team && room.team !== "NONE") ? room.team : null;
     if (window.WWNGame) window.WWNGame.start({
       mode: "online",
       netId: room && room.peerId,
       team: team,
       username: room && room.username,
-      isOwner: !!(room && room.isOwner)
+      isOwner: !!(room && room.isOwner),
+      roomName: room && room.roomName
     });
   }
   function doSolo() { if (window.WWNGame) WWNGame.start({ mode: "solo" }); }
@@ -76,6 +74,7 @@
     };
     if (btnLeave) btnLeave.onclick = function () {
       if (window.WWNRoom && WWNRoom.leave) WWNRoom.leave();
+      if (window.WWNGame && WWNGame.isActive && WWNGame.isActive()) WWNGame.stop();
       var form = document.getElementById("form-panel"), conn = document.getElementById("connected-panel");
       if (conn) conn.classList.add("hidden"); if (form) form.classList.remove("hidden");
     };
