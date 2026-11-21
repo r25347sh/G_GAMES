@@ -15,7 +15,7 @@
     for (var i = 0; i < n; i++) {
       this.drones.push({
         x: player.x + Math.cos(i) * 40, y: player.y + Math.sin(i) * 40,
-        angle: 0, life: 18 + Math.random() * 6, hp: 30, orbit: i * (Math.PI * 2 / n)
+        angle: 0, life: 18 + Math.random() * 6, hp: 30, orbit: i * (Math.PI * 2 / n), fireCd: 0
       });
     }
   };
@@ -41,15 +41,19 @@
     best.team = (player.team && player.team !== "NONE") ? player.team : "BLUE";
     best.ownerId = player.netId || player.id;
     best.leaderId = player.netId || player.id;
-    best.allyType = "phantom";
+    best.allyType = "hivemind";
     best.username = "HIVE";
     best.colorFill = "#e1bee7"; best.colorStroke = "#ce93d8";
     best._target = null;
-    best.fireCd = 0.6;
-    best.dmgMul = Math.min(best.dmgMul || 1, 0.6);
+    best.fireCd = 0.35;
+    best.dmgMul = 0.85;
+    best.speedMul = 1.25;
+    best.threatR = 1100;
+    best.attackRange = 780;
     best.openWeak = false;
     best._remoteAlly = false;
-    if (best.hpMax) best.hp = Math.min(best.hpMax, Math.max(best.hp || 40, 80));
+    best.hpMax = Math.max(best.hpMax || 120, 160);
+    best.hp = best.hpMax;
     return true;
   };
   SupportSystem.prototype.spawnTether = function (player) {
@@ -72,7 +76,22 @@
     }
   };
   SupportSystem.prototype.spawnClone = function (player) {
-    this.clones.push({ x: player.x, y: player.y, life: 10, angle: player.angle });
+    this.clones.push({
+      x: player.x, y: player.y, life: 12, angle: player.angle,
+      trail: [], mirror: true, lag: 0.05 + Math.random() * 0.08, side: 0, phase: Math.random()
+    });
+  };
+  SupportSystem.prototype.spawnKageBunshin = function (player, n) {
+    n = n || 30;
+    for (var i = 0; i < n; i++) {
+      var lag = 0.04 + (i % 10) * 0.03 + Math.random() * 0.02;
+      var side = (i % 2 === 0 ? 1 : -1) * (8 + (i % 5) * 6);
+      this.clones.push({
+        x: player.x, y: player.y, life: 16 + Math.random() * 4,
+        angle: player.angle, trail: [], mirror: true,
+        lag: lag, side: side, phase: i * 0.17
+      });
+    }
   };
   SupportSystem.prototype.spawnDome = function (player, n) {
     this.domes.push({ x: player.x, y: player.y, life: n || 7, r: 120 });
@@ -82,7 +101,6 @@
   };
   SupportSystem.prototype.update = function (dt, player, combat, entities) {
     var list = entities || [];
-    // drones orbit + shoot nearest enemy
     for (var i = this.drones.length - 1; i >= 0; i--) {
       var d = this.drones[i];
       d.life -= dt; d.orbit += dt * 2.2;
@@ -92,16 +110,16 @@
       }
       if (d.life <= 0) { this.drones.splice(i, 1); continue; }
       d.fireCd = (d.fireCd || 0) - dt;
-      if (d.fireCd <= 0 && combat && combat.projectiles) {
+      if (d.fireCd <= 0 && combat && combat.projectiles && combat.projectiles.acquire) {
         var tgt = null, best = 500;
         for (var j = 0; j < list.length; j++) {
           var e = list[j];
-          if (!e || !e.alive || e.isAlly) continue;
+          if (!e || !e.alive || e.isAlly || e.group === "ALLY") continue;
           if (e.team && player && e.team === player.team) continue;
           var dd = Math.hypot(e.x - d.x, e.y - d.y);
           if (dd < best) { best = dd; tgt = e; }
         }
-        if (tgt && combat.projectiles.acquire) {
+        if (tgt) {
           var p = combat.projectiles.acquire();
           var ang = Math.atan2(tgt.y - d.y, tgt.x - d.x);
           p.alive = true; p.type = "bullet"; p.x = d.x; p.y = d.y; p.angle = ang;
@@ -116,16 +134,15 @@
       var t = this.turrets[ti];
       t.life -= dt; t.fireCd = (t.fireCd || 0) - dt;
       if (t.life <= 0) { this.turrets.splice(ti, 1); continue; }
-      if (t.fireCd <= 0 && combat) {
+      if (t.fireCd <= 0 && combat && combat.projectiles && combat.projectiles.acquire) {
         var tgt2 = null, best2 = 700;
         for (var j2 = 0; j2 < list.length; j2++) {
           var e2 = list[j2];
-          if (!e2 || !e2.alive || e2.isAlly) continue;
-          if (e2.team && player && e2.team === player.team) continue;
+          if (!e2 || !e2.alive || e2.isAlly || e2.group === "ALLY") continue;
           var d2 = Math.hypot(e2.x - t.x, e2.y - t.y);
           if (d2 < best2) { best2 = d2; tgt2 = e2; }
         }
-        if (tgt2 && combat.projectiles && combat.projectiles.acquire) {
+        if (tgt2) {
           var p2 = combat.projectiles.acquire();
           var ang2 = Math.atan2(tgt2.y - t.y, tgt2.x - t.x);
           p2.alive = true; p2.type = "bullet"; p2.x = t.x; p2.y = t.y; p2.angle = ang2;
@@ -179,8 +196,7 @@
         var e4 = list[j4];
         if (!e4 || !e4.alive || e4.isAlly) continue;
         if (Math.hypot(e4.x - k.x, e4.y - k.y) < 30) {
-          e4.hp = Math.max(0, e4.hp - 45);
-          k.life = 0;
+          e4.hp = Math.max(0, e4.hp - 45); k.life = 0;
         }
       }
       if (k.life <= 0) this.kamikazes.splice(ki, 1);
@@ -197,7 +213,24 @@
     for (var ci = this.clones.length - 1; ci >= 0; ci--) {
       var c = this.clones[ci];
       c.life -= dt;
-      if (player) { c.x = player.x - 40; c.y = player.y; c.angle = player.angle; }
+      if (player) {
+        if (!c.trail) c.trail = [];
+        c.trail.push({ x: player.x, y: player.y, a: player.angle, t: performance.now() / 1000 });
+        if (c.trail.length > 90) c.trail.shift();
+        var wantT = performance.now() / 1000 - (c.lag || 0.08);
+        var sample = c.trail[0];
+        for (var ti2 = 0; ti2 < c.trail.length; ti2++) {
+          if (c.trail[ti2].t <= wantT) sample = c.trail[ti2];
+          else break;
+        }
+        if (sample) {
+          var ox = Math.cos(sample.a + Math.PI / 2) * (c.side || 0);
+          var oy = Math.sin(sample.a + Math.PI / 2) * (c.side || 0);
+          c.x = sample.x + ox;
+          c.y = sample.y + oy;
+          c.angle = sample.a;
+        }
+      }
       if (c.life <= 0) this.clones.splice(ci, 1);
     }
     for (var di = this.domes.length - 1; di >= 0; di--) {
@@ -257,9 +290,19 @@
       ctx.beginPath(); ctx.arc(sx(k.x), sy(k.y), 6, 0, Math.PI * 2); ctx.fill();
     });
     this.clones.forEach(function (c) {
-      ctx.globalAlpha = 0.45; ctx.fillStyle = "#ce93d8";
-      ctx.beginPath(); ctx.arc(sx(c.x), sy(c.y), 12, 0, Math.PI * 2); ctx.fill();
+      var px = sx(c.x), py = sy(c.y);
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.rotate(c.angle || 0);
+      ctx.globalAlpha = 0.35 + 0.2 * Math.sin((c.phase || 0) + performance.now() / 300);
+      ctx.fillStyle = "#b388ff";
+      ctx.strokeStyle = "rgba(206,147,216,0.8)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(14, 0); ctx.lineTo(-10, 9); ctx.lineTo(-6, 0); ctx.lineTo(-10, -9);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
       ctx.globalAlpha = 1;
+      ctx.restore();
     });
     this.repairBots.forEach(function (rb) {
       ctx.fillStyle = "#69f0ae";
