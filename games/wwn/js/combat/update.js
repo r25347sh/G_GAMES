@@ -8,13 +8,23 @@
   function isFriendlyEntity(p, t) {
     if (!p || !t) return false;
     if (p.ownerId && (t.netId === p.ownerId || t.ownerId === p.ownerId)) return true;
-    if (t.ownerId && p.netId && t.ownerId === p.netId) return true;
+    if (t.ownerId && (p.netId === t.ownerId || p.ownerId === t.ownerId)) return true;
+    if (window.__wwnPlayer) {
+      var me = window.__wwnPlayer;
+      if (t === me || t.netId === me.netId) {
+        if (p.team && me.team && p.team === me.team) return true;
+        if (p.ownerId && p.ownerId === me.netId) return true;
+      }
+      if (p.team && t.team && p.team === me.team && t.team === me.team) return true;
+    }
     if (p.team && t.team && p.team === t.team && p.team !== "NONE") return true;
     return false;
   }
   function queueDmg(t, dmg, ownerId) {
     try {
-      if (window.__wwnNetSync && window.__wwnNetSync.queueDamage && t && t.netId)
+      if (!t || !t.netId || !dmg) return;
+      if (window.__wwnPlayer && t.netId === window.__wwnPlayer.netId) return;
+      if (window.__wwnNetSync && window.__wwnNetSync.queueDamage)
         window.__wwnNetSync.queueDamage(t.netId, dmg, ownerId);
     } catch (e) {}
   }
