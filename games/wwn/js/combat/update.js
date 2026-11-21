@@ -1,15 +1,25 @@
 (function (global) {
   "use strict";
   function friendly(a, b) {
-    if (!a || !b || a === "NONE" || b === "NONE") return false;
-    return a === b;
+    if (!a || !b) return false;
+    if (a === "NONE" || b === "NONE") return false;
+    if (a === b) return true;
+    var blue = { BLUE: 1, ALLY: 1, TEAM_BLUE: 1 };
+    if (blue[a] && blue[b]) return true;
+    return false;
+  }
+  function isFriendlyEntity(p, t) {
+    if (!p || !t) return false;
+    if (t.isAlly && (p.team === "BLUE" || p.team === "ALLY" || p.team === t.team)) return true;
+    if (p.isAlly && (t.team === "BLUE" || t.team === "ALLY" || t.isAlly)) return true;
+    return friendly(p.team, t.team);
   }
   function explodeAt(combat, x, y, aoe, dmg, ownerId, team, targets) {
     combat.spawnParticle(x, y, "#ff6b6b", 18, 140);
     (targets || []).forEach(function (t) {
       if (!t || !t.alive) return;
       if (t.netId === ownerId) return;
-      if (friendly(team, t.team)) return;
+      if (friendly(team, t.team) || (t.isAlly && (team === "BLUE" || team === "ALLY"))) return;
       var d = Math.hypot(t.x - x, t.y - y);
       if (d <= aoe + (t.radius || 18)) {
         var falloff = 1 - (d / (aoe + 20)) * 0.5;
@@ -94,11 +104,9 @@
         }
       }
       p.x += p.vx * dt; p.y += p.vy * dt;
-      // Cluster split into submunitions
       if (p.split > 0 && p.life < (p.maxLife || p.life) * 0.45) {
         var n = Math.min(8, p.split | 0);
-        p.split = 0;
-        p.alive = false;
+        p.split = 0; p.alive = false;
         for (var si = 0; si < n; si++) {
           if (!combat.projectiles || !combat.projectiles.acquire) break;
           var sub = combat.projectiles.acquire();
@@ -120,12 +128,12 @@
         var t = targets[ti];
         if (!t || !t.alive) continue;
         if (t.netId === p.ownerId) continue;
-        if (friendly(p.team, t.team)) continue;
-        var rad = (t.radius || 18) + p.radius;
+        if (isFriendlyEntity(p, t)) continue;
+        var rad = (t.radius || 18) + (p.radius || 3) + (p.type === "missile" ? 6 : 0);
         if (Math.hypot(t.x - p.x, t.y - p.y) <= rad) {
           t.hp = Math.max(0, (t.hp || 0) - p.dmg);
           t.lastHitBy = p.ownerId;
-          if (p.aoe > 0) explodeAt(combat, p.x, p.y, p.aoe, p.dmg * 0.5, p.ownerId, p.team, targets);
+          if (p.aoe > 0 && p.type !== "missile") explodeAt(combat, p.x, p.y, p.aoe, p.dmg * 0.5, p.ownerId, p.team, targets);
           p.alive = false;
           combat.spawnParticle(p.x, p.y, p.color || "#fff", 10, 80);
           break;
@@ -149,8 +157,8 @@
       if (m.life <= 0) { m.alive = false; return; }
       targets.forEach(function (t) {
         if (!t || !t.alive || t.netId === m.ownerId) return;
-        if (friendly(m.team, t.team)) return;
-        if (Math.hypot(t.x - m.x, t.y - m.y) < m.aoe * 0.55) {
+        if (isFriendlyEntity(m, t)) return;
+        if (Math.hypot(t.x - m.x, t.y - m.y) < Math.max(m.aoe * 0.85, (m.radius || 12) + (t.radius || 18) + 8)) {
           explodeAt(combat, m.x, m.y, m.aoe, m.dmg, m.ownerId, m.team, targets);
           m.alive = false;
         }
