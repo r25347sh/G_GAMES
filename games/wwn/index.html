@@ -4,12 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>第n次世界大戦 | WWN</title>
-  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/lobby.css" />
+  <link rel="stylesheet" href="css/game.css" />
 </head>
 <body>
-  <div id="lobby-wrap"></div>
-  <div id="game-layer" class="hidden"></div>
-  <div id="toast"></div>
   <script src="js/net/peer-manager.js" defer></script>
   <script src="js/net/room.js" defer></script>
   <script src="js/net/sync.js" defer></script>
@@ -39,5 +37,82 @@
   <script src="js/core/balance-fixes.js" defer></script>
   <script src="js/core/ai-sprites.js" defer></script>
   <script src="js/main.js" defer></script>
+  <div id="lobby-wrap">
+    <header class="lobby-header">
+      <h1>第n次世界大戦</h1>
+      <p class="tagline">World War N — 空域制圧</p>
+    </header>
+    <div id="toast" class="toast"></div>
+    <section id="form-panel" class="panel">
+      <label>ユーザー名 <input id="username" type="text" maxlength="16" placeholder="Pilot" /></label>
+      <label>ルーム名 <input id="room-name" type="text" maxlength="24" placeholder="Alpha" /></label>
+      <label>キー（任意） <input id="room-key" type="password" maxlength="32" /></label>
+      <div id="mode-grid" class="mode-grid">
+        <button type="button" class="mode-btn active" data-mode="1v1">1v1</button>
+        <button type="button" class="mode-btn" data-mode="team">チーム</button>
+        <button type="button" class="mode-btn" data-mode="open">オープン</button>
+      </div>
+      <div class="row">
+        <button id="btn-join" type="button">ルーム接続</button>
+        <button id="btn-open" type="button">OpenWorldOf_WWN</button>
+      </div>
+      <div class="row">
+        <button id="btn-solo-top" type="button">ソロ出撃</button>
+        <button id="btn-cpu-start" type="button">CPU戦</button>
+      </div>
+      <div class="cpu-opts">
+        <button type="button" class="cpu-btn" data-cpu="1">1</button>
+        <button type="button" class="cpu-btn" data-cpu="3">3</button>
+        <button type="button" class="cpu-btn" data-cpu="5">5</button>
+        <button type="button" class="cpu-btn" data-cpu="10">10</button>
+        <button type="button" class="cpu-btn" data-cpu="21">21</button>
+        <button type="button" class="cpu-btn" data-diff="easy">EASY</button>
+        <button type="button" class="cpu-btn" data-diff="normal">NORMAL</button>
+        <button type="button" class="cpu-btn" data-diff="hard">HARD</button>
+      </div>
+    </section>
+    <section id="connected-panel" class="panel hidden">
+      <p>接続済み。出撃の準備ができました。</p>
+      <button id="btn-sortie" type="button">出撃</button>
+      <button id="btn-leave" type="button">退出</button>
+    </section>
+    <section class="howto panel">
+      <h2>操作</h2>
+      <ul>
+        <li>A/D 回転 · W 前進 · S 後退 · B ブースト</li>
+        <li>Q メイン · F サブ · E ガジェット · R 特殊</li>
+        <li>1/2/3/4 スロット切替</li>
+      </ul>
+    </section>
+  </div>
+  <div id="game-layer" class="hidden">
+    <canvas id="game-canvas"></canvas>
+    <div id="hud">
+      <div class="bars">
+        <div>HULL <span id="hud-hp-text">100 / 100</span><div class="bar"><div id="hud-hp"></div></div></div>
+        <div>BOOST <div class="bar"><div id="hud-boost"></div></div></div>
+        <div>HEAT <div class="bar"><div id="hud-heat"></div></div></div>
+        <div>ENERGY <div class="bar"><div id="hud-energy"></div></div></div>
+      </div>
+      <div class="right">
+        <div id="hud-speed">0 u/s</div>
+        <div id="hud-coord">0, 0</div>
+        <div id="hud-score">PT 0</div>
+      </div>
+      <div class="weapons">
+        <span id="weapon-main">バルカン</span>
+        <span id="weapon-sub">追尾ミサイル</span>
+        <span id="weapon-gadget">空中機雷</span>
+        <span id="secret-slot">—</span>
+      </div>
+      <div id="kill-feed"></div>
+      <canvas id="minimap-canvas"></canvas>
+      <div id="hud-fps">— fps</div>
+      <button id="btn-exit-game" type="button">ロビーへ戻る</button>
+    </div>
+    <div id="respawn-overlay" class="hidden">再出撃…</div>
+    <div id="border-warn" class="hidden">境界接近</div>
+    <div id="gadget-hint"></div>
+  </div>
 </body>
 </html>
