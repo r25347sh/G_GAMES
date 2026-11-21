@@ -139,6 +139,21 @@
     installSecretHooks();
     var player = window.__wwnPlayer, cam = window.__wwnCamera, canvas = document.getElementById("game-canvas");
     if (player && window.WWNGame && WWNGame.isActive && WWNGame.isActive()) {
+      if (!player.alive) {
+        player.respawnTimer = (player.respawnTimer || 0) - 1/60;
+        var ov = document.getElementById("respawn-overlay");
+        if (ov) {
+          ov.classList.remove("hidden");
+          ov.textContent = player.respawnTimer > 0.05 ? ("再出撃… " + player.respawnTimer.toFixed(1) + "s") : "再出撃中";
+        }
+        if (player.respawnTimer <= 0 && player.tryRespawn && player.tryRespawn()) {
+          if (window.__wwnLoadout && __wwnLoadout.refillAmmo) __wwnLoadout.refillAmmo();
+          if (ov) ov.classList.add("hidden");
+        }
+      } else {
+        var ov2 = document.getElementById("respawn-overlay");
+        if (ov2) ov2.classList.add("hidden");
+      }
       tickShadows(player, 1 / 60); tickGimmicks(player, 1 / 60);
       if (player.__slowUntil && performance.now() / 1000 < player.__slowUntil) { player.vx *= 0.92; player.vy *= 0.92; }
       if (canvas && cam) {
